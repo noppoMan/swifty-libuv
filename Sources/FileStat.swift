@@ -39,7 +39,7 @@ internal class FileStatWrap {
             
             if(req.pointee.result < 0) {
                 return context.completion {
-                    throw Error.UVError(code: Int32(req.pointee.result))
+                    throw Error.uvError(code: Int32(req.pointee.result))
                 }
             }
             
@@ -49,7 +49,7 @@ internal class FileStatWrap {
         if r < 0 {
             fs_req_cleanup(req)
             context.completion {
-                throw Error.UVError(code: r)
+                throw Error.uvError(code: r)
             }
         }
     }

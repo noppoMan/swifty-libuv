@@ -13,22 +13,21 @@ import CLibUv
  */
 public enum Error: ErrorProtocol, CustomStringConvertible {
     // Error from libuv's errorno
-    case UVError(code: Int32)
-    case EOF
-    case NoPendingCount
-    case PendingTypeIsMismatched
-    case ClosedStream
-    case ArgumentError(message: String)
-    case BindRequired
+    case uvError(code: Int32)
+    case eof
+    case noPendingCount
+    case pendingTypeIsMismatched
+    case argumentError(message: String)
+    case bindRequired
 }
 
 extension Error {
     /**
-     Returns errorno for UVError
+     Returns errorno for uvError
      */
     public var errorno: uv_errno_t? {
         switch(self) {
-        case .UVError(let code):
+        case .uvError(let code):
             return uv_errno_t(code)
         default:
             return nil
@@ -36,11 +35,11 @@ extension Error {
     }
     
     /**
-     Returns error type for UVError
+     Returns error type for uvError
      */
     public var type: String {
         switch(self) {
-        case .UVError(let code):
+        case .uvError(let code):
             return String(validatingUTF8: uv_err_name(code)) ??  "UNKNOWN"
         default:
             return "SwiftyLibuvError"
@@ -52,19 +51,17 @@ extension Error {
      */
     public var message: String {
         switch(self) {
-        case .UVError(let code):
+        case .uvError(let code):
             return String(validatingUTF8: uv_strerror(code)) ?? "Unknow Error"
-        case .EOF:
+        case .eof:
             return "EOF"
-        case .NoPendingCount:
+        case .noPendingCount:
             return "No pending count"
-        case .PendingTypeIsMismatched:
+        case .pendingTypeIsMismatched:
             return "Penging type is mismatched"
-        case .ClosedStream:
-            return "The stream was alreay closed"
-        case .ArgumentError(let message):
+        case .argumentError(let message):
             return message
-        case .BindRequired:
+        case .bindRequired:
             return "First, You need to call `bind`"
         }
     }

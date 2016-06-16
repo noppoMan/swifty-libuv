@@ -44,14 +44,14 @@ public class UDPWrap: HandleWrap {
     public func bind(_ addr: Address, flags: UVUdpFlags = .None) throws {
         let r = uv_udp_bind(socket, addr.address, flags.rawValue)
         if r < 0 {
-            throw Error.UVError(code: r)
+            throw Error.uvError(code: r)
         }
     }
     
     public func setBroadcast(_ on: Bool) throws {
         let r = uv_udp_set_broadcast(socket, on ? 1: 0)
         if r < 0 {
-            throw Error.UVError(code: r)
+            throw Error.uvError(code: r)
         }
     }
     
@@ -92,14 +92,14 @@ public class UDPWrap: HandleWrap {
             let onSend: ((Void) throws -> Void) -> Void = releaseVoidPointer(req?.pointee.data)!
             onSend {
                 if status > 0 {
-                    throw Error.UVError(code: status)
+                    throw Error.uvError(code: status)
                 }
             }
         }
         
         if r < 0 {
             onSend {
-                throw Error.UVError(code: r)
+                throw Error.uvError(code: r)
             }
         }
     }
@@ -120,11 +120,11 @@ public class UDPWrap: HandleWrap {
             
             if (nread == Int(UV_EOF.rawValue)) {
                 onRecv {
-                    throw Error.EOF
+                    throw Error.eof
                 }
             } else if (nread < 0) {
                 onRecv {
-                    throw Error.UVError(code: Int32(nread))
+                    throw Error.uvError(code: Int32(nread))
                 }
             } else {
                 req.pointee.data = retainedVoidPointer(onRecv)
@@ -145,7 +145,7 @@ public class UDPWrap: HandleWrap {
         
         if r < 0 {
             onRecv {
-                throw Error.UVError(code: r)
+                throw Error.uvError(code: r)
             }
         }
     }
@@ -155,7 +155,7 @@ public class UDPWrap: HandleWrap {
         
         let r = uv_udp_recv_stop(socket)
         if r < 0 {
-            throw Error.UVError(code: r)
+            throw Error.uvError(code: r)
         }
     }
     

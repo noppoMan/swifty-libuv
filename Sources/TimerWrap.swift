@@ -23,18 +23,18 @@ struct TimerContext {
  Timer state enum
  */
 public enum TimerState {
-    case Pause
-    case Running
-    case Stop
-    case End
+    case pause
+    case running
+    case stop
+    case end
 }
 
 /**
  Timer mode
  */
 public enum TimerMode {
-    case Interval
-    case Timeout
+    case interval
+    case timeout
 }
 
 /**
@@ -45,7 +45,7 @@ public class TimerWrap {
     /**
      Current timer state
      */
-    public private(set) var state: TimerState = .Pause
+    public private(set) var state: TimerState = .pause
     
     public let mode: TimerMode
     
@@ -61,7 +61,7 @@ public class TimerWrap {
      - parameter mode: .Interval or Timeout
      - parameter tick: Micro sec for timer tick.
      */
-    public init(loop: Loop = Loop.defaultLoop, mode: TimerMode = .Timeout, tick: UInt64){
+    public init(loop: Loop = Loop.defaultLoop, mode: TimerMode = .timeout, tick: UInt64){
         self.mode = mode
         self.tick = tick
         self.handle = UnsafeMutablePointer<uv_timer_t>(allocatingCapacity: sizeof(uv_timer_t))
@@ -86,16 +86,16 @@ public class TimerWrap {
      Stop the timer. If you stop the timer, it can restart with calling resume.
      */
     public func stop() {
-        if case .End = state { return }
+        if case .end = state { return }
         uv_timer_stop(handle)
-        state = .Stop
+        state = .stop
     }
     
     /**
      Start the timer with specific mode
      */
     public func start(_ callback: () -> ()){
-        if case .End = state { return }
+        if case .end = state { return }
         if initalized { return }
         
         context = UnsafeMutablePointer<TimerContext>(allocatingCapacity: 1)
@@ -104,12 +104,12 @@ public class TimerWrap {
         handle.pointee.data = UnsafeMutablePointer(context)
         
         switch(mode) {
-        case .Timeout:
+        case .timeout:
             uv_timer_start(handle, timer_start_cb, UInt64(tick), 0)
-        case .Interval:
+        case .interval:
             uv_timer_start(handle, timer_start_cb, 0, UInt64(tick))
         }
-        state = .Running
+        state = .running
         initalized = true
     }
     
@@ -117,9 +117,9 @@ public class TimerWrap {
      Resume the timer that is initialized once
      */
     public func resume() {
-        if case .End = state { return }
+        if case .end = state { return }
         uv_timer_again(handle)
-        state = .Running
+        state = .running
     }
     
     /**
@@ -128,10 +128,10 @@ public class TimerWrap {
      If you forgot to call end, memory leak will be occured.
      */
     public func end(){
-        if case .End = state { return }
+        if case .end = state { return }
         stop()
         unref()
-        self.state = .End
+        self.state = .end
         dealloc(handle)
     }
 }

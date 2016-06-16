@@ -48,7 +48,7 @@ public class TCPWrap: StreamWrap {
     public func setNoDelay(_ enable: Bool) throws {
         let r = uv_tcp_nodelay(socket, enable ? 1: 0)
         if r < 0 {
-            throw Error.UVError(code: r)
+            throw Error.uvError(code: r)
         }
         
         noDelayed = enable
@@ -63,7 +63,7 @@ public class TCPWrap: StreamWrap {
     public func setKeepAlive(_ enable: Bool, delay: UInt) throws {
         let r = uv_tcp_keepalive(socket, enable ? 1: 0, UInt32(delay))
         if r < 0 {
-            throw Error.UVError(code: r)
+            throw Error.uvError(code: r)
         }
         
         keepAlived = enable
@@ -73,7 +73,7 @@ public class TCPWrap: StreamWrap {
     public func bind(_ addr: Address) throws {
         let r = uv_tcp_bind(UnsafeMutablePointer<uv_tcp_t>(self.streamPtr), addr.address, 0)
         if r < 0 {
-            throw Error.UVError(code: r)
+            throw Error.uvError(code: r)
         }
     }
     
@@ -89,7 +89,7 @@ public class TCPWrap: StreamWrap {
             stream.pointee.data = retainedVoidPointer(onConnection)
             guard status >= 0 else {
                 onConnection {
-                    throw Error.UVError(code: status)
+                    throw Error.uvError(code: status)
                 }
                 return
             }
@@ -98,7 +98,7 @@ public class TCPWrap: StreamWrap {
         }
         
         if result < 0 {
-            throw Error.UVError(code: result)
+            throw Error.uvError(code: result)
         }
     }
     
@@ -123,7 +123,7 @@ public class TCPWrap: StreamWrap {
             
             if status < 0 {
                 calllback {
-                    throw Error.UVError(code: status)
+                    throw Error.uvError(code: status)
                 }
             }
             
@@ -132,7 +132,7 @@ public class TCPWrap: StreamWrap {
         
         if r < 0 {
             completion {
-                throw Error.UVError(code: r)
+                throw Error.uvError(code: r)
             }
         }
     }

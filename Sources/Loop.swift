@@ -26,7 +26,7 @@ public class Loop {
      
      - parameter mode: RunMode Default is RunMode.Default
      */
-    public func run(mode: RunMode = .Default){
+    public func run(mode: RunMode = .runDefault){
         uv_run(self.loopPtr, mode.rawValue)
     }
     

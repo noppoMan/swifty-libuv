@@ -15,9 +15,9 @@
 import CLibUv
 
 public enum FsReadResult {
-    case Data(Buffer)
-    case End(Int)
-    case Error(ErrorProtocol)
+    case data(Buffer)
+    case end(Int)
+    case error(ErrorProtocol)
 }
 
 private class FileReaderContext {
@@ -85,7 +85,7 @@ private func readNext(_ context: FileReaderContext){
     
     if r < 0 {
         fs_req_cleanup(readReq)
-        context.onRead(.Error(Error.UVError(code: r)))
+        context.onRead(.error(Error.uvError(code: r)))
     }
 }
 
@@ -100,19 +100,19 @@ private func onReadEach(_ req: UnsafeMutablePointer<uv_fs_t>?) {
     }
     
     if(req.pointee.result < 0) {
-        let e = Error.UVError(code: Int32(req.pointee.result))
-        return context.onRead(.Error(e))
+        let e = Error.uvError(code: Int32(req.pointee.result))
+        return context.onRead(.error(e))
     }
     
     var buf = Buffer()
     for i in stride(from: 0, to: req.pointee.result, by: 1) {
         buf.append(context.buf!.base[i])
     }
-    context.onRead(.Data(buf))
+    context.onRead(.data(buf))
     context.bytesRead += req.pointee.result
     
     if(req.pointee.result < FileReader.upTo) {
-        return context.onRead(.End(Int(context.bytesRead)))
+        return context.onRead(.end(Int(context.bytesRead)))
     }
     
     readNext(context)

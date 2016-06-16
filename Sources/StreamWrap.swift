@@ -100,7 +100,7 @@ extension StreamWrap {
         
         let result = uv_accept(stream.streamPtr, client.streamPtr)
         if(result < 0) {
-            throw Error.UVError(code: result)
+            throw Error.uvError(code: result)
         }
     }
 }
@@ -132,7 +132,7 @@ extension StreamWrap {
             if r < 0 {
                 destroy_write_req(writeReq)
                 onWrite {
-                    throw Error.UVError(code: r)
+                    throw Error.uvError(code: r)
                 }
             }
         }
@@ -180,7 +180,7 @@ extension StreamWrap {
             if r < 0 {
                 destroy_write_req(writeReq)
                 onWrite {
-                    throw Error.UVError(code: r)
+                    throw Error.uvError(code: r)
                 }
             }
         }
@@ -197,7 +197,7 @@ extension StreamWrap {
         
         let r = uv_read_stop(streamPtr)
         if r < 0 {
-            throw Error.UVError(code: r)
+            throw Error.uvError(code: r)
         }
     }
     
@@ -214,11 +214,11 @@ extension StreamWrap {
                 let queue = try getQueue()
                 
                 if uv_pipe_pending_count(queue.pipePtr) <= 0 {
-                    throw Error.NoPendingCount
+                    throw Error.noPendingCount
                 }
                 
                 if uv_pipe_pending_type(queue.pipePtr) != pendingType.rawValue {
-                    throw Error.PendingTypeIsMismatched
+                    throw Error.pendingTypeIsMismatched
                 }
                 
                 return queue
@@ -240,11 +240,11 @@ extension StreamWrap {
             
             if (nread == Int(UV_EOF.rawValue)) {
                 callback {
-                    throw Error.ClosedStream
+                    throw Error.eof
                 }
             } else if (nread < 0) {
                 callback {
-                    throw Error.UVError(code: Int32(nread))
+                    throw Error.uvError(code: Int32(nread))
                 }
             } else {
                 queue.pointee.data = retainedVoidPointer(callback)
@@ -256,7 +256,7 @@ extension StreamWrap {
         
         if r < 0 {
             callback {
-                throw Error.UVError(code: r)
+                throw Error.uvError(code: r)
             }
         }
     }
@@ -282,11 +282,11 @@ extension StreamWrap {
             
             if (nread == Int(UV_EOF.rawValue)) {
                 onRead {
-                    throw Error.EOF
+                    throw Error.eof
                 }
             } else if (nread < 0) {
                 onRead {
-                    throw Error.UVError(code: Int32(nread))
+                    throw Error.uvError(code: Int32(nread))
                 }
             } else {
                 stream.pointee.data = retainedVoidPointer(onRead)
@@ -298,7 +298,7 @@ extension StreamWrap {
         
         if r < 0 {
             callback {
-                throw Error.UVError(code: r)
+                throw Error.uvError(code: r)
             }
         }
     }

@@ -12,24 +12,24 @@ import CLibUv
  Mode used to run the loop with uv_run()
  */
 public enum RunMode {
-    case Default
-    case Once
-    case NoWait
+    case runDefault
+    case runOnce
+    case runNoWait
 }
 
 extension RunMode {
     init(mode: uv_run_mode) {
         switch mode {
-        case UV_RUN_ONCE: self = .Once
-        case UV_RUN_NOWAIT: self = .NoWait
-        default: self = .Default
+        case UV_RUN_ONCE: self = .runOnce
+        case UV_RUN_NOWAIT: self = .runNoWait
+        default: self = .runDefault
         }
     }
     
     public var rawValue: uv_run_mode {
         switch self {
-        case .Once: return UV_RUN_ONCE
-        case .NoWait: return UV_RUN_NOWAIT
+        case .runOnce: return UV_RUN_ONCE
+        case .runNoWait: return UV_RUN_NOWAIT
         default: return UV_RUN_DEFAULT
         }
     }

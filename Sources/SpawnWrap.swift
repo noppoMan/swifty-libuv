@@ -38,16 +38,16 @@ internal let ENV_ARRAY = dict2ArrayWithEqualSeparator(Process.env)
  } uv_stdio_flags;
  */
 public enum StdioFlags: Int32 {
-    case Ignore = 0x00
-    case CreatePipe = 0x01
-    case InheritFd = 0x02
-    case InheritStream = 0x04
+    case ignore = 0x00
+    case createPipe = 0x01
+    case inheritFd = 0x02
+    case inheritStream = 0x04
     
-    case ReadablePipe = 0x10
-    case WritablePipe = 0x20
+    case readablePipe = 0x10
+    case writablePipe = 0x20
     
-    case CreateReadablePipe = 0x11 // UV_CREATE_PIPE | UV_READABLE_PIPE
-    case CreateWritablePipe = 0x21 // UV_CREATE_PIPE | UV_WRITABLE_PIPE
+    case createReadablePipe = 0x11 // UV_CREATE_PIPE | UV_READABLE_PIPE
+    case createWritablePipe = 0x21 // UV_CREATE_PIPE | UV_WRITABLE_PIPE
 }
 
 /**
@@ -95,13 +95,13 @@ public struct SpawnOptions {
     public init(loop: Loop = Loop.defaultLoop){
         stdio = [
             // stdin
-            StdioOption(flags: .CreateReadablePipe, pipe: PipeWrap(loop: loop)),
+            StdioOption(flags: .createReadablePipe, pipe: PipeWrap(loop: loop)),
             
             // stdout
-            StdioOption(flags: .CreateWritablePipe, pipe: PipeWrap(loop: loop)),
+            StdioOption(flags: .createWritablePipe, pipe: PipeWrap(loop: loop)),
             
             // stderr
-            StdioOption(flags: .CreateWritablePipe, pipe: PipeWrap(loop: loop))
+            StdioOption(flags: .createWritablePipe, pipe: PipeWrap(loop: loop))
         ]
     }
 }
@@ -168,28 +168,28 @@ public class SpawnWrap {
             
             switch(op.flags) {
             // Ready for readableStream
-            case .CreateWritablePipe:
+            case .createWritablePipe:
                 guard let stream = op.pipe else {
-                    throw Error.ArgumentError(message: "pipe is required for flags of [CreateWritablePipe]")
+                    throw Error.argumentError(message: "pipe is required for flags of [CreateWritablePipe]")
                 }
                 options.pointee.stdio[i].data.stream = stream.streamPtr
                 
             // Ready for writableStream
-            case .CreateReadablePipe:
+            case .createReadablePipe:
                 guard let stream = op.pipe else {
-                    throw Error.ArgumentError(message: "pipe is required for flags of [CreateReadablePipe]")
+                    throw Error.argumentError(message: "pipe is required for flags of [CreateReadablePipe]")
                 }
                 options.pointee.stdio[i].data.stream = stream.streamPtr
                 
-            case .InheritStream:
+            case .inheritStream:
                 guard let stream = op.pipe else {
-                    throw Error.ArgumentError(message: "opened pipe is required for flags of [InheritStream]")
+                    throw Error.argumentError(message: "opened pipe is required for flags of [InheritStream]")
                 }
                 options.pointee.stdio[i].data.stream = stream.streamPtr
                 
-            case .InheritFd:
+            case .inheritFd:
                 guard let fd = op.fd else {
-                    throw Error.ArgumentError(message: "fd is required for flags of [InheritFd]")
+                    throw Error.argumentError(message: "fd is required for flags of [InheritFd]")
                 }
                 options.pointee.stdio[i].data.fd = fd
                 
@@ -217,7 +217,7 @@ public class SpawnWrap {
         let r = uv_spawn(loop, childReq, options)
         if r < 0 {
             close_handle(childReq)
-            throw Error.UVError(code: r)
+            throw Error.uvError(code: r)
         }
         
         proc.pid = childReq.pointee.pid

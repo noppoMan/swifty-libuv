@@ -27,14 +27,14 @@ public class FSWrap {
      Equivalent to unlink(2).
      
      - Throws:
-     Error.UVError
+     Error.uvError
      */
     public static func unlink(_ path: String, loop: Loop = Loop.defaultLoop) throws {
         let req = UnsafeMutablePointer<uv_fs_t>(allocatingCapacity: sizeof(uv_fs_t))
         let r = uv_fs_unlink(loop.loopPtr, req, path, nil)
         fs_req_cleanup(req)
         if r < 0 {
-            throw Error.UVError(code: r)
+            throw Error.uvError(code: r)
         }
     }
     
@@ -55,15 +55,15 @@ public class FSWrap {
             position: position
         ) { res in
             switch(res) {
-            case .Error(let e):
+            case .error(let e):
                 completion {
                     throw e
                 }
-            case .Data(let buf):
+            case .data(let buf):
                 completion {
                     return buf
                 }
-            case .End(let pos):
+            case .end(let pos):
                 if pos == 0 {
                     completion {
                         []
@@ -128,7 +128,7 @@ public class FSWrap {
             
             if(req.pointee.result < 0) {
                 return ctx.onOpen {
-                    throw Error.UVError(code: Int32(req.pointee.result))
+                    throw Error.uvError(code: Int32(req.pointee.result))
                 }
             }
             
@@ -140,7 +140,7 @@ public class FSWrap {
         if r < 0 {
             fs_req_cleanup(req)
             completion {
-                throw Error.UVError(code: r)
+                throw Error.uvError(code: r)
             }
         }
     }

@@ -9,24 +9,6 @@
 import CLibUv
 
 /**
- File Descriptor enum for Stdio
- - STDIN: Standard input, 0
- - STDOUT: Standard output, 1
- - STDERR: Standard error, 2
- - CLUSTER_MODE_IPC: FD for ipc on cluster mode, 3
- */
-public enum Stdio: Int32 {
-    case STDIN  = 0
-    case STDOUT = 1
-    case STDERR = 2
-    case CLUSTER_MODE_IPC = 3
-    
-    public var intValue: Int {
-        return Int(self.rawValue)
-    }
-}
-
-/**
  Pipe handle type
  */
 public class PipeWrap: StreamWrap {
@@ -44,16 +26,6 @@ public class PipeWrap: StreamWrap {
     /**
      Open an existing file descriptor or HANDLE as a pipe
      
-     - parameter stdio: Number of fd to open (Stdio)
-     */
-    public func open(_ stdio: Stdio = Stdio.STDIN) -> Self {
-        uv_pipe_open(pipePtr, stdio.rawValue)
-        return self
-    }
-    
-    /**
-     Open an existing file descriptor or HANDLE as a pipe
-     
      - parameter stdio: Number of fd to open (Int32)
      */
     public func open(_ stdio: Int32) -> Self {
@@ -65,7 +37,7 @@ public class PipeWrap: StreamWrap {
         let r = uv_pipe_bind(pipePtr, sockName)
         
         if r < 0 {
-            throw Error.UVError(code: r)
+            throw Error.uvError(code: r)
         }
     }
     
@@ -80,7 +52,7 @@ public class PipeWrap: StreamWrap {
             let onConnection: ((Void) throws -> Void) -> Void = releaseVoidPointer(stream.pointee.data)!
             guard status >= 0 else {
                 return onConnection {
-                    throw Error.UVError(code: status)
+                    throw Error.uvError(code: status)
                 }
             }
             
@@ -89,7 +61,7 @@ public class PipeWrap: StreamWrap {
         
         if result < 0 {
             onConnection {
-                throw Error.UVError(code: result)
+                throw Error.uvError(code: result)
             }
         }
     }
@@ -112,7 +84,7 @@ public class PipeWrap: StreamWrap {
             let onConnect: ((Void) throws -> StreamWrap) -> Void = releaseVoidPointer(req.pointee.data)!
             if status < 0 {
                 onConnect {
-                    throw Error.UVError(code: status)
+                    throw Error.uvError(code: status)
                 }
             }
             
