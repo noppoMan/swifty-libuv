@@ -28,8 +28,8 @@ public class PipeWrap: StreamWrap {
      
      - parameter stdio: Number of fd to open (Int32)
      */
-    public func open(_ stdio: Int32) -> Self {
-        uv_pipe_open(pipePtr, stdio)
+    public func open(_ stdio: Int) -> Self {
+        uv_pipe_open(pipePtr, Int32(stdio))
         return self
     }
     
