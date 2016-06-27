@@ -133,9 +133,14 @@ public class UDPWrap: HandleWrap {
                 var sender = [Int8](repeating: 0, count: 17)
                 let addrin = UnsafePointer<sockaddr_in>(sockaddr)
                 uv_ip4_name(addrin, &sender, 16)
+                #if os(Linux)
+                    let port = Int(ntohs(addrin.pointee.sin_port))
+                #else
+                    let port = Int(NSSwapBigShortToHost(addrin.pointee.sin_port))
+                #endif
                 
-                let addr = Address(host: String(validatingUTF8: sender)!, port:
-                    Int(NSSwapBigShortToHost(addrin.pointee.sin_port)))
+                let addr = Address(host: String(validatingUTF8: sender)!, port: port)
+                
                 let buf = Buffer(buffer: UnsafePointer<UInt8>(buf.pointee.base), length: nread)
                 onRecv {
                     (buf, addr)
