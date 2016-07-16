@@ -33,7 +33,7 @@ func fs_req_cleanup(_ req: UnsafeMutablePointer<uv_fs_t>) {
 
 func dealloc<T>(_ ponter: UnsafeMutablePointer<T>, capacity: Int? = nil){
     ponter.deinitialize()
-    ponter.deallocateCapacity(capacity ?? sizeof(T))
+    ponter.deallocateCapacity(capacity ?? sizeof(T.self))
 }
 
 internal func dict2ArrayWithEqualSeparator(_ dict: [String: String]) -> [String] {

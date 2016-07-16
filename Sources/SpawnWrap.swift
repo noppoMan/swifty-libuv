@@ -141,9 +141,9 @@ public class SpawnWrap {
         // initialize process
         let proc = Proc(stdio: opts.stdio)
         
-        let childReq = UnsafeMutablePointer<uv_process_t>(allocatingCapacity: sizeof(uv_process_t))
-        let options = UnsafeMutablePointer<uv_process_options_t>(allocatingCapacity: sizeof(uv_process_options_t))
-        memset(options, 0, sizeof(uv_process_options_t))
+        let childReq = UnsafeMutablePointer<uv_process_t>(allocatingCapacity: sizeof(uv_process_t.self))
+        let options = UnsafeMutablePointer<uv_process_options_t>(allocatingCapacity: sizeof(uv_process_options_t.self))
+        memset(options, 0, sizeof(uv_process_options_t.self))
         
         defer {
             dealloc(options, capacity: opts.stdio.count)

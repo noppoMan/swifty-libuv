@@ -44,7 +44,7 @@ private struct QueueWorkerContext {
 
 public class QueueWorkerWrap {
     public init(loop: Loop = Loop.defaultLoop, workCB: () -> (), afterWorkCB: () -> ()) {
-        let req = UnsafeMutablePointer<uv_work_t>(allocatingCapacity: sizeof(uv_work_t))
+        let req = UnsafeMutablePointer<uv_work_t>(allocatingCapacity: sizeof(uv_work_t.self))
         
         let context = QueueWorkerContext(workCB: workCB, afterWorkCB: afterWorkCB)
         

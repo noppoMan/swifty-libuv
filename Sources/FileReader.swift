@@ -76,7 +76,7 @@ public class FileReader {
 
 
 private func readNext(_ context: FileReaderContext){
-    let readReq = UnsafeMutablePointer<uv_fs_t>(allocatingCapacity: sizeof(uv_fs_t))
+    let readReq = UnsafeMutablePointer<uv_fs_t>(allocatingCapacity: sizeof(uv_fs_t.self))
     context.buf = uv_buf_init(UnsafeMutablePointer(allocatingCapacity: FileReader.upTo), UInt32(FileReader.upTo))
     
     readReq.pointee.data = retainedVoidPointer(context)

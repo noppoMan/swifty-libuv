@@ -78,7 +78,7 @@ extension StreamWrap {
     public func shutdown(_ completion: () -> () = { _ in }) {
         if isClosing() { return }
         
-        let req = UnsafeMutablePointer<uv_shutdown_t>(allocatingCapacity: sizeof(uv_shutdown_t))
+        let req = UnsafeMutablePointer<uv_shutdown_t>(allocatingCapacity: sizeof(uv_shutdown_t.self))
         req.pointee.data =  retainedVoidPointer(completion)
         uv_shutdown(req, streamPtr) { req, status in
             guard let req = req else {
@@ -122,7 +122,7 @@ extension StreamWrap {
         var dummy_buf = uv_buf_init(UnsafeMutablePointer<Int8>(bytes), 1)
         
         withUnsafePointer(&dummy_buf) {
-            let writeReq = UnsafeMutablePointer<uv_write_t>(allocatingCapacity: sizeof(uv_write_t))
+            let writeReq = UnsafeMutablePointer<uv_write_t>(allocatingCapacity: sizeof(uv_write_t.self))
             let r = uv_write2(writeReq, ipcPipe.streamPtr, $0, 1, self.streamPtr) { req, _ in
                 if let req = req {
                     destroy_write_req(req)
@@ -164,7 +164,7 @@ extension StreamWrap {
         var data = uv_buf_init(bytes, length)
         
         withUnsafePointer(&data) {
-            let writeReq = UnsafeMutablePointer<uv_write_t>(allocatingCapacity: sizeof(uv_write_t))
+            let writeReq = UnsafeMutablePointer<uv_write_t>(allocatingCapacity: sizeof(uv_write_t.self))
             writeReq.pointee.data = retainedVoidPointer(onWrite)
             
             let r = uv_write(writeReq, streamPtr, $0, 1) { req, _ in

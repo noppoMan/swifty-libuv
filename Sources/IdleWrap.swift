@@ -32,7 +32,7 @@ public class IdleWrap {
     public private(set) var isStarted = false
     
     public init(loop: Loop = Loop.defaultLoop){
-        handle = UnsafeMutablePointer<uv_idle_t>(allocatingCapacity: sizeof(uv_idle_t))
+        handle = UnsafeMutablePointer<uv_idle_t>(allocatingCapacity: sizeof(uv_idle_t.self))
         ctx = UnsafeMutablePointer<IdleContext>(allocatingCapacity: 1)
         ctx.initialize(with: IdleContext())
         handle.pointee.data = UnsafeMutablePointer(ctx)

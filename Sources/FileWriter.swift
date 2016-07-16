@@ -77,7 +77,7 @@ public class FileWriter {
 }
 
 private func attemptWrite(_ context: FileWriterContext){
-    var writeReq = UnsafeMutablePointer<uv_fs_t>(allocatingCapacity: sizeof(uv_fs_t))
+    var writeReq = UnsafeMutablePointer<uv_fs_t>(allocatingCapacity: sizeof(uv_fs_t.self))
     
     var bytes = context.data.bytes.map { Int8(bitPattern: $0) }
     context.buf = uv_buf_init(&bytes, UInt32(context.data.bytes.count))

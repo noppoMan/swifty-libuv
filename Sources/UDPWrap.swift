@@ -36,7 +36,7 @@ public class UDPWrap: HandleWrap {
     private var socket: UnsafeMutablePointer<uv_udp_t>
     
     public init(loop: Loop = Loop.defaultLoop) {
-        self.socket = UnsafeMutablePointer<uv_udp_t>(allocatingCapacity: sizeof(uv_udp_t))
+        self.socket = UnsafeMutablePointer<uv_udp_t>(allocatingCapacity: sizeof(uv_udp_t.self))
         uv_udp_init(loop.loopPtr, socket)
         super.init(UnsafeMutablePointer<uv_handle_t>(socket))
     }
@@ -84,7 +84,7 @@ public class UDPWrap: HandleWrap {
     private func sendBytes(_ bytes: UnsafeMutablePointer<Int8>, length: UInt32, addr: Address, onSend: ((Void) throws -> Void) -> Void = {
         _ in }) {
         
-        let req = UnsafeMutablePointer<uv_udp_send_t>(allocatingCapacity: sizeof(uv_udp_send_t))
+        let req = UnsafeMutablePointer<uv_udp_send_t>(allocatingCapacity: sizeof(uv_udp_send_t.self))
         req.pointee.data = retainedVoidPointer(onSend)
         var data = uv_buf_init(bytes, length)
         
