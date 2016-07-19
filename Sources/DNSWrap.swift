@@ -126,7 +126,7 @@ public class DNS {
      - parameter port: The port number(String) to resolve
      */
     public static func getAddrInfo(loop: Loop = Loop.defaultLoop, fqdn: String, port: String? = nil, completion: ((Void) throws -> [AddrInfo]) -> Void){
-        let req = UnsafeMutablePointer<uv_getaddrinfo_t>(allocatingCapacity: sizeof(uv_getaddrinfo_t))
+        let req = UnsafeMutablePointer<uv_getaddrinfo_t>(allocatingCapacity: sizeof(uv_getaddrinfo_t.self))
         
         let context = DnsContext(completion: completion)
         

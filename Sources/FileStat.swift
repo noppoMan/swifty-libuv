@@ -25,7 +25,7 @@ internal class FileStatWrap {
         self.path = path
         self.context = FileStatContext(completion: completion)
         
-        var req = UnsafeMutablePointer<uv_fs_t>(allocatingCapacity: sizeof(uv_fs_t))
+        var req = UnsafeMutablePointer<uv_fs_t>(allocatingCapacity: sizeof(uv_fs_t.self))
         req.pointee.data = retainedVoidPointer(context)
         
         let r = uv_fs_stat(loop.loopPtr, req, path) { req in

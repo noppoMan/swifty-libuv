@@ -107,7 +107,7 @@ public class TCPWrap: StreamWrap {
      - parameter completion: Completion handler
      */
     public func connect(_ addr: Address, completion: ((Void) throws -> Void) -> Void) {
-        let con = UnsafeMutablePointer<uv_connect_t>(allocatingCapacity: sizeof(uv_connect_t))
+        let con = UnsafeMutablePointer<uv_connect_t>(allocatingCapacity: sizeof(uv_connect_t.self))
         con.pointee.data = retainedVoidPointer(completion)
         
         let r = uv_tcp_connect(con, self.socket, addr.address) { connection, status in

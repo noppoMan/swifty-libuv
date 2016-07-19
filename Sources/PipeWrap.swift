@@ -18,7 +18,7 @@ public class PipeWrap: StreamWrap {
     }
     
     public init(loop: Loop = Loop.defaultLoop, ipcEnable: Bool = false){
-        let pipe = UnsafeMutablePointer<uv_pipe_t>(allocatingCapacity: sizeof(uv_pipe_t))
+        let pipe = UnsafeMutablePointer<uv_pipe_t>(allocatingCapacity: sizeof(uv_pipe_t.self))
         uv_pipe_init(loop.loopPtr, pipe, ipcEnable ? 1 : 0)
         super.init(UnsafeMutablePointer<uv_stream_t>(pipe))
     }
@@ -73,7 +73,7 @@ public class PipeWrap: StreamWrap {
      - parameter onConnect: Will be called when the connection is succeeded or failed
      */
     public func connect(_ sockName: String, onConnect: ((Void) throws -> StreamWrap) -> Void){
-        let req = UnsafeMutablePointer<uv_connect_t>(allocatingCapacity: sizeof(uv_connect_t))
+        let req = UnsafeMutablePointer<uv_connect_t>(allocatingCapacity: sizeof(uv_connect_t.self))
         
         req.pointee.data = retainedVoidPointer(onConnect)
         

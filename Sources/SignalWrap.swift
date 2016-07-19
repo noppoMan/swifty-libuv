@@ -31,7 +31,7 @@ public class SignalWrap {
     
     public init(loop: Loop = Loop.defaultLoop){
         self.loop = loop
-        self.signalPtr = UnsafeMutablePointer<uv_signal_t>(allocatingCapacity: sizeof(uv_signal_t))
+        self.signalPtr = UnsafeMutablePointer<uv_signal_t>(allocatingCapacity: sizeof(uv_signal_t.self))
         uv_signal_init(loop.loopPtr, signalPtr)
     }
     

@@ -64,7 +64,7 @@ public class TimerWrap {
     public init(loop: Loop = Loop.defaultLoop, mode: TimerMode = .timeout, tick: UInt64){
         self.mode = mode
         self.tick = tick
-        self.handle = UnsafeMutablePointer<uv_timer_t>(allocatingCapacity: sizeof(uv_timer_t))
+        self.handle = UnsafeMutablePointer<uv_timer_t>(allocatingCapacity: sizeof(uv_timer_t.self))
         uv_timer_init(loop.loopPtr, handle)
     }
     
