@@ -79,11 +79,11 @@ extension addrinfo {
 }
 
 func getaddrinfo_cb(req: UnsafeMutablePointer<uv_getaddrinfo_t>?, status: Int32, res: UnsafeMutablePointer<addrinfo>?){
-    guard let req = req, res = res else {
+    guard let req = req, let res = res else {
         return
     }
     
-    let context: DnsContext = releaseVoidPointer(req.pointee.data)!
+    let context: DnsContext = releaseVoidPointer(req.pointee.data)
     
     defer {
         freeaddrinfo(res)
@@ -92,7 +92,7 @@ func getaddrinfo_cb(req: UnsafeMutablePointer<uv_getaddrinfo_t>?, status: Int32,
     
     if status < 0 {
         return context.completion {
-            throw Error.uvError(code: status)
+            throw SwiftyLibUvError.uvError(code: status)
         }
     }
     
@@ -125,8 +125,8 @@ public class DNS {
      - parameter fqdn: The fqdn to resolve
      - parameter port: The port number(String) to resolve
      */
-    public static func getAddrInfo(loop: Loop = Loop.defaultLoop, fqdn: String, port: String? = nil, completion: ((Void) throws -> [AddrInfo]) -> Void){
-        let req = UnsafeMutablePointer<uv_getaddrinfo_t>(allocatingCapacity: sizeof(uv_getaddrinfo_t.self))
+    public static func getAddrInfo(loop: Loop = Loop.defaultLoop, fqdn: String, port: String? = nil, completion: @escaping ((Void) throws -> [AddrInfo]) -> Void){
+        let req = UnsafeMutablePointer<uv_getaddrinfo_t>.allocate(capacity: MemoryLayout<uv_getaddrinfo_t>.size)
         
         let context = DnsContext(completion: completion)
         
@@ -144,7 +144,7 @@ public class DNS {
                 dealloc(req)
             }
             completion {
-                throw Error.uvError(code: r)
+                throw SwiftyLibUvError.uvError(code: r)
             }
         }
         

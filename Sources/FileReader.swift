@@ -17,7 +17,7 @@ import CLibUv
 public enum FsReadResult {
     case data(Buffer)
     case end(Int)
-    case error(ErrorProtocol)
+    case error(Error)
 }
 
 private class FileReaderContext {
@@ -42,7 +42,7 @@ private class FileReaderContext {
      */
     var position: Int
     
-    init(loop: Loop = Loop.defaultLoop, fd: Int32, length: Int? = nil, position: Int, completion: (FsReadResult) -> Void){
+    init(loop: Loop = Loop.defaultLoop, fd: Int32, length: Int? = nil, position: Int, completion: @escaping (FsReadResult) -> Void){
         self.loop = loop
         self.fd = fd
         self.position = position
@@ -58,7 +58,7 @@ public class FileReader {
     
     private let context: FileReaderContext
     
-    public init(loop: Loop = Loop.defaultLoop, fd: Int32, offset: Int = 0, length: Int? = nil, position: Int, completion: (FsReadResult) -> Void){
+    public init(loop: Loop = Loop.defaultLoop, fd: Int32, offset: Int = 0, length: Int? = nil, position: Int, completion: @escaping (FsReadResult) -> Void){
         context = FileReaderContext(
             loop: loop,
             fd: fd,
@@ -76,8 +76,8 @@ public class FileReader {
 
 
 private func readNext(_ context: FileReaderContext){
-    let readReq = UnsafeMutablePointer<uv_fs_t>(allocatingCapacity: sizeof(uv_fs_t.self))
-    context.buf = uv_buf_init(UnsafeMutablePointer(allocatingCapacity: FileReader.upTo), UInt32(FileReader.upTo))
+    let readReq = UnsafeMutablePointer<uv_fs_t>.allocate(capacity: MemoryLayout<uv_fs_t>.size)
+    context.buf = uv_buf_init(UnsafeMutablePointer<Int8>.allocate(capacity: FileReader.upTo), UInt32(FileReader.upTo))
     
     readReq.pointee.data = retainedVoidPointer(context)
     let r = uv_fs_read(context.loop.loopPtr, readReq, uv_file(context.fd), &context.buf!, 1, context.bytesRead, onReadEach)
@@ -85,7 +85,7 @@ private func readNext(_ context: FileReaderContext){
     
     if r < 0 {
         fs_req_cleanup(readReq)
-        context.onRead(.error(Error.uvError(code: r)))
+        context.onRead(.error(SwiftyLibUvError.uvError(code: r)))
     }
 }
 
@@ -94,13 +94,13 @@ private func onReadEach(_ req: UnsafeMutablePointer<uv_fs_t>?) {
         return
     }
     
-    let context: FileReaderContext = releaseVoidPointer(req.pointee.data)!
+    let context: FileReaderContext = releaseVoidPointer(req.pointee.data)
     defer {
         fs_req_cleanup(req)
     }
     
     if(req.pointee.result < 0) {
-        let e = Error.uvError(code: Int32(req.pointee.result))
+        let e = SwiftyLibUvError.uvError(code: Int32(req.pointee.result))
         return context.onRead(.error(e))
     }
     

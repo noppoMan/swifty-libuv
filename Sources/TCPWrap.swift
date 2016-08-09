@@ -29,9 +29,9 @@ public class TCPWrap: StreamWrap {
      - parameter loop: event loop. Default is Loop.defaultLoop
      */
     public init(loop: Loop = Loop.defaultLoop){
-        self.socket = UnsafeMutablePointer<uv_tcp_t>(allocatingCapacity: 1)
+        self.socket = UnsafeMutablePointer<uv_tcp_t>.allocate(capacity: 1)
         uv_tcp_init(loop.loopPtr, socket)
-        super.init(UnsafeMutablePointer<uv_stream_t>(socket))
+        super.init(socket.cast(to: UnsafeMutablePointer<uv_stream_t>.self))
     }
     
     /**
@@ -39,7 +39,7 @@ public class TCPWrap: StreamWrap {
      */
     public init(socket: UnsafeMutablePointer<uv_tcp_t>){
         self.socket = socket
-        super.init(UnsafeMutablePointer<uv_stream_t>(socket))
+        super.init(self.socket.cast(to: UnsafeMutablePointer<uv_stream_t>.self))
     }
     
     /**
@@ -48,7 +48,7 @@ public class TCPWrap: StreamWrap {
     public func setNoDelay(_ enable: Bool) throws {
         let r = uv_tcp_nodelay(socket, enable ? 1: 0)
         if r < 0 {
-            throw Error.uvError(code: r)
+            throw SwiftyLibUvError.uvError(code: r)
         }
         
         noDelayed = enable
@@ -63,7 +63,7 @@ public class TCPWrap: StreamWrap {
     public func setKeepAlive(_ enable: Bool, delay: UInt) throws {
         let r = uv_tcp_keepalive(socket, enable ? 1: 0, UInt32(delay))
         if r < 0 {
-            throw Error.uvError(code: r)
+            throw SwiftyLibUvError.uvError(code: r)
         }
         
         keepAlived = enable
@@ -71,9 +71,9 @@ public class TCPWrap: StreamWrap {
     
     
     public func bind(_ addr: Address) throws {
-        let r = uv_tcp_bind(UnsafeMutablePointer<uv_tcp_t>(self.streamPtr), addr.address, 0)
+        let r = uv_tcp_bind(self.streamPtr.cast(to: UnsafeMutablePointer<uv_tcp_t>.self), addr.address, 0)
         if r < 0 {
-            throw Error.uvError(code: r)
+            throw SwiftyLibUvError.uvError(code: r)
         }
     }
     
@@ -85,11 +85,11 @@ public class TCPWrap: StreamWrap {
                 return
             }
             
-            let onConnection: ((Void) throws -> Void) -> Void = releaseVoidPointer(stream.pointee.data)!
+            let onConnection: ((Void) throws -> Void) -> Void = releaseVoidPointer(stream.pointee.data)
             stream.pointee.data = retainedVoidPointer(onConnection)
             guard status >= 0 else {
                 onConnection {
-                    throw Error.uvError(code: status)
+                    throw SwiftyLibUvError.uvError(code: status)
                 }
                 return
             }
@@ -98,7 +98,7 @@ public class TCPWrap: StreamWrap {
         }
         
         if result < 0 {
-            throw Error.uvError(code: result)
+            throw SwiftyLibUvError.uvError(code: result)
         }
     }
     
@@ -107,7 +107,7 @@ public class TCPWrap: StreamWrap {
      - parameter completion: Completion handler
      */
     public func connect(_ addr: Address, completion: ((Void) throws -> Void) -> Void) {
-        let con = UnsafeMutablePointer<uv_connect_t>(allocatingCapacity: sizeof(uv_connect_t.self))
+        let con = UnsafeMutablePointer<uv_connect_t>.allocate(capacity: MemoryLayout<uv_connect_t>.size)
         con.pointee.data = retainedVoidPointer(completion)
         
         let r = uv_tcp_connect(con, self.socket, addr.address) { connection, status in
@@ -119,11 +119,11 @@ public class TCPWrap: StreamWrap {
                 dealloc(connection)
             }
             
-            let calllback: ((Void) throws -> Void) -> Void = releaseVoidPointer(connection.pointee.data)!
+            let calllback: ((Void) throws -> Void) -> Void = releaseVoidPointer(connection.pointee.data)
             
             if status < 0 {
                 calllback {
-                    throw Error.uvError(code: status)
+                    throw SwiftyLibUvError.uvError(code: status)
                 }
             }
             
@@ -132,7 +132,7 @@ public class TCPWrap: StreamWrap {
         
         if r < 0 {
             completion {
-                throw Error.uvError(code: r)
+                throw SwiftyLibUvError.uvError(code: r)
             }
         }
     }
