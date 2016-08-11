@@ -6,6 +6,14 @@
 //
 //
 
+import CLibUv
+
+let alloc_buffer: @convention(c) (UnsafeMutablePointer<uv_handle_t>?, ssize_t, UnsafeMutablePointer<uv_buf_t>?) -> Void = { (handle, suggestedSize, buf) in
+    if let buf = buf {
+        buf.pointee = uv_buf_init(UnsafeMutablePointer<Int8>.allocate(capacity: suggestedSize), UInt32(suggestedSize))
+    }
+}
+
 public struct Buffer {
     public var bytes: [UInt8]
     
@@ -34,7 +42,7 @@ public struct Buffer {
     }
 }
 
-extension Buffer: ArrayLiteralConvertible {
+extension Buffer: ExpressibleByArrayLiteral {
     public init(arrayLiteral bytes: UInt8...) {
         self.init(bytes)
     }

@@ -31,14 +31,14 @@ public class SignalWrap {
     
     public init(loop: Loop = Loop.defaultLoop){
         self.loop = loop
-        self.signalPtr = UnsafeMutablePointer<uv_signal_t>(allocatingCapacity: sizeof(uv_signal_t.self))
+        self.signalPtr = UnsafeMutablePointer<uv_signal_t>.allocate(capacity: MemoryLayout<uv_signal_t>.size)
         uv_signal_init(loop.loopPtr, signalPtr)
     }
     
-    public func start(_ sig: Int32, signalHandler: (Int32) -> ()){
+    public func start(_ sig: Int32, signalHandler: @escaping (Int32) -> ()){
         self.signalHandler = signalHandler
         
-        signalPtr.pointee.data = unsafeBitCast(self, to: UnsafeMutablePointer<Void>.self)
+        signalPtr.pointee.data = unsafeBitCast(self, to: UnsafeMutableRawPointer.self)
         uv_signal_start(signalPtr, { handle, sig in
             if let handle = handle {
                 let _signal = unsafeBitCast(handle.pointee.data, to: SignalWrap.self)

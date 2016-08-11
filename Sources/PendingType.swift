@@ -11,7 +11,9 @@ import CLibUv
 public enum PendingType {
     case tcp
     case udp
-    case pipe
+    case namedPipe
+    case stream
+    case tty
 }
 
 extension PendingType {
@@ -21,8 +23,12 @@ extension PendingType {
             return UV_TCP
         case .udp:
             return UV_UDP
-        default:
+        case .namedPipe:
+            return UV_NAMED_PIPE
+        case .stream:
             return UV_STREAM
+        case .tty:
+            return UV_TTY
         }
     }
 }

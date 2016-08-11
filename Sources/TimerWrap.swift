@@ -9,7 +9,7 @@
 import CLibUv
 
 private func timer_start_cb(handle: UnsafeMutablePointer<uv_timer_t>?){
-    if let handle = handle, context = UnsafeMutablePointer<TimerContext>(handle.pointee.data) {
+    if let context = handle?.pointee.data.assumingMemoryBound(to: TimerContext.self) {
         context.pointee.callback()
     }
 }
@@ -64,7 +64,7 @@ public class TimerWrap {
     public init(loop: Loop = Loop.defaultLoop, mode: TimerMode = .timeout, tick: UInt64){
         self.mode = mode
         self.tick = tick
-        self.handle = UnsafeMutablePointer<uv_timer_t>(allocatingCapacity: sizeof(uv_timer_t.self))
+        self.handle = UnsafeMutablePointer<uv_timer_t>.allocate(capacity: MemoryLayout<uv_timer_t>.size)
         uv_timer_init(loop.loopPtr, handle)
     }
     
@@ -72,14 +72,14 @@ public class TimerWrap {
      Reference the internal uv_timer_t handle
      */
     public func ref(){
-        uv_ref(UnsafeMutablePointer<uv_handle_t>(handle))
+        uv_ref(handle.cast(to: UnsafeMutablePointer<uv_handle_t>.self))
     }
     
     /**
      Un-reference the internal uv_timer_t handle
      */
     public func unref(){
-        uv_unref(UnsafeMutablePointer<uv_handle_t>(handle))
+        uv_unref(handle.cast(to: UnsafeMutablePointer<uv_handle_t>.self))
     }
     
     /**
@@ -94,14 +94,13 @@ public class TimerWrap {
     /**
      Start the timer with specific mode
      */
-    public func start(_ callback: () -> ()){
+    public func start(_ callback: @escaping () -> ()){
         if case .end = state { return }
         if initalized { return }
         
-        context = UnsafeMutablePointer<TimerContext>(allocatingCapacity: 1)
-        context?.initialize(with: TimerContext(callback: callback))
-        
-        handle.pointee.data = UnsafeMutablePointer(context)
+        context = UnsafeMutablePointer<TimerContext>.allocate(capacity: 1)
+        context?.initialize(to: TimerContext(callback: callback))
+        handle.pointee.data = UnsafeMutableRawPointer(context)
         
         switch(mode) {
         case .timeout:

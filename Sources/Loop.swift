@@ -17,7 +17,7 @@ public class Loop {
      */
     public let loopPtr: UnsafeMutablePointer<uv_loop_t>
     
-    public init(loop: UnsafeMutablePointer<uv_loop_t> = UnsafeMutablePointer<uv_loop_t>(allocatingCapacity: 1)) {
+    public init(loop: UnsafeMutablePointer<uv_loop_t> = UnsafeMutablePointer<uv_loop_t>.allocate(capacity: 1) ) {
         self.loopPtr = loop
     }
     

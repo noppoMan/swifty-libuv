@@ -17,12 +17,18 @@ public enum SocketState {
  */
 public class StreamWrap: HandleWrap {
     
+    public enum StreamWrapError: Error {
+        case noPendingCount
+        case eof
+        case pendingTypeIsMismatched
+    }
+    
     /**
      Initialize with Pointer of the uv_stream_t
      - parameter stream: Pointer of the uv_stream_t
      */
     public init(_ stream: UnsafeMutablePointer<uv_stream_t>){
-        super.init(UnsafeMutablePointer<uv_handle_t>(stream))
+        super.init(stream.cast(to: UnsafeMutablePointer<uv_handle_t>.self))
     }
 }
 
@@ -39,11 +45,11 @@ extension StreamWrap {
      C lang Pointer to the uv_stream_t
      */
     internal var streamPtr: UnsafeMutablePointer<uv_stream_t> {
-        return UnsafeMutablePointer<uv_stream_t>(handlePtr)
+        return handlePtr.cast(to: UnsafeMutablePointer<uv_stream_t>.self)
     }
     
     internal var pipePtr: UnsafeMutablePointer<uv_pipe_t> {
-        return UnsafeMutablePointer<uv_pipe_t>(handlePtr)
+        return handlePtr.cast(to: UnsafeMutablePointer<uv_pipe_t>.self)
     }
     
     /**
@@ -78,13 +84,13 @@ extension StreamWrap {
     public func shutdown(_ completion: () -> () = { _ in }) {
         if isClosing() { return }
         
-        let req = UnsafeMutablePointer<uv_shutdown_t>(allocatingCapacity: sizeof(uv_shutdown_t.self))
+        let req = UnsafeMutablePointer<uv_shutdown_t>.allocate(capacity: MemoryLayout<uv_shutdown_t>.size)
         req.pointee.data =  retainedVoidPointer(completion)
         uv_shutdown(req, streamPtr) { req, status in
             guard let req = req else {
                 return
             }
-            let completion: () -> () = releaseVoidPointer(req.pointee.data)!
+            let completion: () -> () = releaseVoidPointer(req.pointee.data)
             completion()
             dealloc(req)
         }
@@ -100,7 +106,7 @@ extension StreamWrap {
         
         let result = uv_accept(stream.streamPtr, client.streamPtr)
         if(result < 0) {
-            throw Error.uvError(code: result)
+            throw SwiftyLibUvError.uvError(code: result)
         }
     }
 }
@@ -117,12 +123,12 @@ extension StreamWrap {
      - paramter  data: Buffer to write
      - parameter onWrite: Completion handler(Not implemented yet)
      */
-    public func write2(ipcPipe: PipeWrap, onWrite: ((Void) throws -> Void) -> Void = { _ in }){
+    public func write2(ipcPipe: PipeWrap, onWrite: @escaping ((Void) throws -> Void) -> Void = { _ in }){
         let bytes: [Int8] = [97]
-        var dummy_buf = uv_buf_init(UnsafeMutablePointer<Int8>(bytes), 1)
+        var dummy_buf = uv_buf_init(UnsafeMutablePointer<Int8>(mutating: bytes), 1)
         
-        withUnsafePointer(&dummy_buf) {
-            let writeReq = UnsafeMutablePointer<uv_write_t>(allocatingCapacity: sizeof(uv_write_t.self))
+        withUnsafePointer(to: &dummy_buf) {
+            let writeReq = UnsafeMutablePointer<uv_write_t>.allocate(capacity: MemoryLayout<uv_write_t>.size)
             let r = uv_write2(writeReq, ipcPipe.streamPtr, $0, 1, self.streamPtr) { req, _ in
                 if let req = req {
                     destroy_write_req(req)
@@ -132,7 +138,7 @@ extension StreamWrap {
             if r < 0 {
                 destroy_write_req(writeReq)
                 onWrite {
-                    throw Error.uvError(code: r)
+                    throw SwiftyLibUvError.uvError(code: r)
                 }
             }
         }
@@ -145,8 +151,9 @@ extension StreamWrap {
      - parameter onWrite: Completion handler
      */
     public func write(bytes data: [Int8], onWrite: ((Void) throws -> Void) -> Void = { _ in }) {
-        let bytes = UnsafeMutablePointer<Int8>(data)
-        writeBytes(bytes, length: UInt32(data.count), onWrite: onWrite)
+        data.withUnsafeBufferPointer {
+            writeBytes(UnsafeMutablePointer(mutating: $0.baseAddress!) , length: UInt32($0.count), onWrite: onWrite)
+        }
     }
     
     /**
@@ -156,15 +163,16 @@ extension StreamWrap {
      - parameter onWrite: Completion handler
      */
     public func write(buffer data: Buffer, onWrite: ((Void) throws -> Void) -> Void) {
-        let bytes = UnsafeMutablePointer<Int8>(data.bytes)
-        writeBytes(bytes, length: UInt32(data.bytes.count), onWrite: onWrite)
+        data.bytes.map({CChar($0)}).withUnsafeBufferPointer({
+            writeBytes(UnsafeMutablePointer(mutating: $0.baseAddress!), length: UInt32($0.count), onWrite: onWrite)
+        })
     }
     
     private func writeBytes(_ bytes: UnsafeMutablePointer<Int8>, length: UInt32, onWrite: ((Void) throws -> Void) -> Void = { _ in }){
         var data = uv_buf_init(bytes, length)
         
-        withUnsafePointer(&data) {
-            let writeReq = UnsafeMutablePointer<uv_write_t>(allocatingCapacity: sizeof(uv_write_t.self))
+        withUnsafePointer(to: &data) {
+            let writeReq = UnsafeMutablePointer<uv_write_t>.allocate(capacity: MemoryLayout<uv_write_t>.size)
             writeReq.pointee.data = retainedVoidPointer(onWrite)
             
             let r = uv_write(writeReq, streamPtr, $0, 1) { req, _ in
@@ -172,7 +180,7 @@ extension StreamWrap {
                     return
                 }
                 
-                let onWrite: ((Void) throws -> Void) -> Void = releaseVoidPointer(req.pointee.data)!
+                let onWrite: ((Void) throws -> Void) -> Void = releaseVoidPointer(req.pointee.data)
                 destroy_write_req(req)
                 onWrite {}
             }
@@ -180,7 +188,7 @@ extension StreamWrap {
             if r < 0 {
                 destroy_write_req(writeReq)
                 onWrite {
-                    throw Error.uvError(code: r)
+                    throw SwiftyLibUvError.uvError(code: r)
                 }
             }
         }
@@ -197,7 +205,7 @@ extension StreamWrap {
         
         let r = uv_read_stop(streamPtr)
         if r < 0 {
-            throw Error.uvError(code: r)
+            throw SwiftyLibUvError.uvError(code: r)
         }
     }
     
@@ -207,18 +215,18 @@ extension StreamWrap {
      - parameter pendingType: uv_handle_type
      - parameter callback: Completion handler
      */
-    public func read2(pendingType: PendingType, callback: ((Void) throws -> PipeWrap) -> Void) {
+    public func read2(pendingType: PendingType, callback: @escaping ((Void) throws -> PipeWrap) -> Void) {
         
         let onRead: ((Void) throws -> PipeWrap) -> Void = { getQueue in
             callback {
                 let queue = try getQueue()
                 
                 if uv_pipe_pending_count(queue.pipePtr) <= 0 {
-                    throw Error.noPendingCount
+                    throw StreamWrapError.noPendingCount
                 }
                 
                 if uv_pipe_pending_type(queue.pipePtr) != pendingType.rawValue {
-                    throw Error.pendingTypeIsMismatched
+                    throw StreamWrapError.pendingTypeIsMismatched
                 }
                 
                 return queue
@@ -228,7 +236,7 @@ extension StreamWrap {
         streamPtr.pointee.data = retainedVoidPointer(onRead)
         
         let r = uv_read_start(streamPtr, alloc_buffer) { queue, nread, buf in
-            guard let queue = queue, buf = buf else {
+            guard let queue = queue, let buf = buf else {
                 return
             }
             
@@ -236,27 +244,27 @@ extension StreamWrap {
                 dealloc(buf.pointee.base, capacity: nread)
             }
             
-            let callback: ((Void) throws -> PipeWrap) -> Void = releaseVoidPointer(queue.pointee.data)!
+            let callback: ((Void) throws -> PipeWrap) -> Void = releaseVoidPointer(queue.pointee.data)
             
             if (nread == Int(UV_EOF.rawValue)) {
                 callback {
-                    throw Error.eof
+                    throw StreamWrapError.eof
                 }
             } else if (nread < 0) {
                 callback {
-                    throw Error.uvError(code: Int32(nread))
+                    throw SwiftyLibUvError.uvError(code: Int32(nread))
                 }
             } else {
                 queue.pointee.data = retainedVoidPointer(callback)
                 callback {
-                    PipeWrap(pipe: UnsafeMutablePointer<uv_pipe_t>(queue))
+                    PipeWrap(pipe: queue.cast(to: UnsafeMutablePointer<uv_pipe_t>.self))
                 }
             }
         }
         
         if r < 0 {
             callback {
-                throw Error.uvError(code: r)
+                throw SwiftyLibUvError.uvError(code: r)
             }
         }
     }
@@ -270,7 +278,7 @@ extension StreamWrap {
         streamPtr.pointee.data = retainedVoidPointer(callback)
         
         let r = uv_read_start(streamPtr, alloc_buffer) { stream, nread, buf in
-            guard let stream = stream, buf = buf else {
+            guard let stream = stream, let buf = buf else {
                 return
             }
             
@@ -278,27 +286,31 @@ extension StreamWrap {
                 dealloc(buf.pointee.base, capacity: nread)
             }
             
-            let onRead: ((Void) throws -> Buffer) -> Void = releaseVoidPointer(stream.pointee.data)!
+            let onRead: ((Void) throws -> Buffer) -> Void = releaseVoidPointer(stream.pointee.data)
             
             if (nread == Int(UV_EOF.rawValue)) {
                 onRead {
-                    throw Error.eof
+                    throw StreamWrapError.eof
                 }
             } else if (nread < 0) {
                 onRead {
-                    throw Error.uvError(code: Int32(nread))
+                    throw SwiftyLibUvError.uvError(code: Int32(nread))
                 }
             } else {
                 stream.pointee.data = retainedVoidPointer(onRead)
                 onRead {
-                    Buffer(buffer: UnsafePointer<UInt8>(buf.pointee.base), length: nread)
+                    var buffer = Buffer()
+                    for i in stride(from: 0, to: nread, by: 1) {
+                        buffer.append(buf.pointee.base[i])
+                    }
+                    return buffer
                 }
             }
         }
         
         if r < 0 {
             callback {
-                throw Error.uvError(code: r)
+                throw SwiftyLibUvError.uvError(code: r)
             }
         }
     }

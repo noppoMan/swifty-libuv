@@ -56,7 +56,7 @@ public struct OS {
     
     public static func cpus() -> [CPUInfo] {
         var info: UnsafeMutablePointer<uv_cpu_info_t>?
-        info = UnsafeMutablePointer<uv_cpu_info_t>(allocatingCapacity: sizeof(uv_cpu_info_t.self))
+        info = UnsafeMutablePointer<uv_cpu_info_t>.allocate(capacity: MemoryLayout<uv_cpu_info_t>.size)
         
         var cpuCount: Int32 = 0
         uv_cpu_info(&info, &cpuCount)

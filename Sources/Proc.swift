@@ -57,7 +57,7 @@ public class Proc {
      
      - parameter callback: Completion handler
      */
-    public func onExit(_ callback: (Int64) -> ()){
+    public func onExit(_ callback: @escaping (Int64) -> ()){
         self.onExitCallback = callback
     }
     

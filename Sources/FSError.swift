@@ -6,7 +6,7 @@
 //
 //
 
-public enum FSError: ErrorProtocol {
+public enum FSError: Error {
     case InvalidPosition(Int)
 }
 

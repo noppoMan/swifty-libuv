@@ -39,7 +39,7 @@ private class FileWriterContext {
         return position + Int(bytesWritten)
     }
     
-    init(loop: Loop = Loop.defaultLoop, fd: Int32, data: Buffer, offset: Int, length: Int? = nil, position: Int, completion: ((Void) throws -> Int) -> Void){
+    init(loop: Loop = Loop.defaultLoop, fd: Int32, data: Buffer, offset: Int, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Int) -> Void){
         self.loop = loop
         self.fd = fd
         self.data = data
@@ -54,7 +54,7 @@ public class FileWriter {
     
     private var context: FileWriterContext
     
-    public init(loop: Loop = Loop.defaultLoop, fd: Int32, data: Buffer, offset: Int, length: Int? = nil, position: Int, completion: ((Void) throws -> Int) -> Void){
+    public init(loop: Loop = Loop.defaultLoop, fd: Int32, data: Buffer, offset: Int, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Int) -> Void){
         context = FileWriterContext(
             loop: loop,
             fd: fd,
@@ -77,12 +77,12 @@ public class FileWriter {
 }
 
 private func attemptWrite(_ context: FileWriterContext){
-    var writeReq = UnsafeMutablePointer<uv_fs_t>(allocatingCapacity: sizeof(uv_fs_t.self))
+    var writeReq = UnsafeMutablePointer<uv_fs_t>.allocate(capacity: MemoryLayout<uv_fs_t>.size)
     
     var bytes = context.data.bytes.map { Int8(bitPattern: $0) }
     context.buf = uv_buf_init(&bytes, UInt32(context.data.bytes.count))
     
-    withUnsafePointer(&context.buf!) {
+    withUnsafePointer(to: &context.buf!) {
         writeReq.pointee.data = retainedVoidPointer(context)
         
         let r = uv_fs_write(context.loop.loopPtr, writeReq, uv_file(context.fd), $0, UInt32(context.buf!.len), Int64(context.curPos)) { req in
@@ -96,7 +96,7 @@ private func attemptWrite(_ context: FileWriterContext){
                 fs_req_cleanup(writeReq)
             }
             context.onWrite {
-                throw Error.uvError(code: r)
+                throw SwiftyLibUvError.uvError(code: r)
             }
             return
         }
@@ -108,11 +108,11 @@ private func onWriteEach(_ req: UnsafeMutablePointer<uv_fs_t>){
         fs_req_cleanup(req)
     }
     
-    let context: FileWriterContext = releaseVoidPointer(req.pointee.data)!
+    let context: FileWriterContext = releaseVoidPointer(req.pointee.data)
     
     if(req.pointee.result < 0) {
         return context.onWrite {
-            throw Error.uvError(code: Int32(req.pointee.result))
+            throw SwiftyLibUvError.uvError(code: Int32(req.pointee.result))
         }
     }
     

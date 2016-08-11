@@ -27,10 +27,10 @@ public class Address {
     
     var address: UnsafePointer<sockaddr> {
         if _sockAddrinPtr == nil {
-            _sockAddrinPtr = UnsafeMutablePointer<sockaddr_in>(allocatingCapacity: 1)
+            _sockAddrinPtr = UnsafeMutablePointer<sockaddr_in>.allocate(capacity: 1)
             uv_ip4_addr(host, Int32(port), _sockAddrinPtr)
         }
-        return UnsafePointer(_sockAddrinPtr!)
+        return _sockAddrinPtr!.cast(to: UnsafePointer<sockaddr>.self)
     }
     
     /**

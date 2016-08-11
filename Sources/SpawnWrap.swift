@@ -22,7 +22,15 @@
 
 import CLibUv
 
-internal let ENV_ARRAY = dict2ArrayWithEqualSeparator(Process.env)
+private func dict2ArrayWithEqualSeparator(_ dict: [String: String]) -> [String] {
+    var envs = [String]()
+    for (k,v) in dict {
+        envs.append("\(k)=\(v)")
+    }
+    return envs
+}
+
+internal let ENV_ARRAY = dict2ArrayWithEqualSeparator(CommandLine.env)
 
 /**
  Flags for stdio
@@ -115,12 +123,17 @@ private func exit_cb(req: UnsafeMutablePointer<uv_process_t>?, status: Int64, si
         close_handle(req)
     }
     
-    let context = Unmanaged<Proc>.fromOpaque(UnsafeMutablePointer(req.pointee.data)).takeRetainedValue()
+    let context = Unmanaged<Proc>.fromOpaque(UnsafeMutableRawPointer(req.pointee.data)).takeRetainedValue()
     
     context.onExitCallback(status)
 }
 
 public class SpawnWrap {
+    
+    public enum SpawnWrapError: Error {
+        case pipeArgumentIsRequiredForFlags
+        case fdArgumentIsRequiredForFlags
+    }
     
     let execPath: String
     
@@ -141,9 +154,9 @@ public class SpawnWrap {
         // initialize process
         let proc = Proc(stdio: opts.stdio)
         
-        let childReq = UnsafeMutablePointer<uv_process_t>(allocatingCapacity: sizeof(uv_process_t.self))
-        let options = UnsafeMutablePointer<uv_process_options_t>(allocatingCapacity: sizeof(uv_process_options_t.self))
-        memset(options, 0, sizeof(uv_process_options_t.self))
+        let childReq = UnsafeMutablePointer<uv_process_t>.allocate(capacity: MemoryLayout<uv_process_t>.size)
+        let options = UnsafeMutablePointer<uv_process_options_t>.allocate(capacity: MemoryLayout<uv_process_options_t>.size)
+        memset(options, 0, MemoryLayout<uv_process_options_t>.size)
         
         defer {
             dealloc(options, capacity: opts.stdio.count)
@@ -153,13 +166,13 @@ public class SpawnWrap {
             options.pointee.cwd = cwd.buffer
         }
         
-        var env = (ENV_ARRAY + dict2ArrayWithEqualSeparator(opts.env)).map{ $0.buffer }
+        var env = (ENV_ARRAY + dict2ArrayWithEqualSeparator(opts.env)).map{ UnsafeMutablePointer<Int8>(mutating: $0.buffer) }
         env.append(nil)
         
-        options.pointee.env = UnsafeMutablePointer(env)
+        options.pointee.env = UnsafeMutablePointer(mutating: env)
         
         // stdio
-        options.pointee.stdio = UnsafeMutablePointer<uv_stdio_container_t>(allocatingCapacity: opts.stdio.count)
+        options.pointee.stdio = UnsafeMutablePointer<uv_stdio_container_t>.allocate(capacity: opts.stdio.count)
         options.pointee.stdio_count = Int32(opts.stdio.count)
         
         for i in 0..<opts.stdio.count {
@@ -170,26 +183,26 @@ public class SpawnWrap {
             // Ready for readableStream
             case .createWritablePipe:
                 guard let stream = op.pipe else {
-                    throw Error.argumentError(message: "pipe is required for flags of [CreateWritablePipe]")
+                    throw SpawnWrapError.pipeArgumentIsRequiredForFlags
                 }
                 options.pointee.stdio[i].data.stream = stream.streamPtr
                 
             // Ready for writableStream
             case .createReadablePipe:
                 guard let stream = op.pipe else {
-                    throw Error.argumentError(message: "pipe is required for flags of [CreateReadablePipe]")
+                    throw SpawnWrapError.pipeArgumentIsRequiredForFlags
                 }
                 options.pointee.stdio[i].data.stream = stream.streamPtr
                 
             case .inheritStream:
                 guard let stream = op.pipe else {
-                    throw Error.argumentError(message: "opened pipe is required for flags of [InheritStream]")
+                    throw SpawnWrapError.pipeArgumentIsRequiredForFlags
                 }
                 options.pointee.stdio[i].data.stream = stream.streamPtr
                 
             case .inheritFd:
                 guard let fd = op.fd else {
-                    throw Error.argumentError(message: "fd is required for flags of [InheritFd]")
+                    throw SpawnWrapError.fdArgumentIsRequiredForFlags
                 }
                 options.pointee.stdio[i].data.fd = fd
                 
@@ -198,11 +211,11 @@ public class SpawnWrap {
             }
         }
         
-        var argv = ([execPath] + execOptions).map { $0.buffer }
+        var argv = ([execPath] + execOptions).map { UnsafeMutablePointer<Int8>(mutating: $0.buffer) }
         argv.append(nil)
         
         options.pointee.file = execPath.withCString { $0 }
-        options.pointee.args = UnsafeMutablePointer(argv)
+        options.pointee.args = UnsafeMutablePointer(mutating: argv)
         
         if(opts.detached) {
             options.pointee.exit_cb = nil
@@ -212,12 +225,12 @@ public class SpawnWrap {
         }
         
         let unmanaged = Unmanaged.passRetained(proc).toOpaque()
-        childReq.pointee.data = UnsafeMutablePointer(unmanaged)
+        childReq.pointee.data = UnsafeMutableRawPointer(unmanaged)
         
         let r = uv_spawn(loop, childReq, options)
         if r < 0 {
             close_handle(childReq)
-            throw Error.uvError(code: r)
+            throw SwiftyLibUvError.uvError(code: r)
         }
         
         proc.pid = childReq.pointee.pid

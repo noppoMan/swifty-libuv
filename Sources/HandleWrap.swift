@@ -8,11 +8,22 @@
 
 import CLibUv
 
+internal func close_handle<T>(_ req: UnsafeMutablePointer<T>){
+    if uv_is_closing(req.cast(to: UnsafeMutablePointer<uv_handle_t>.self)) == 1 {
+        return
+    }
+    uv_close(req.cast(to: UnsafeMutablePointer<uv_handle_t>.self)) {
+        if let handle = $0 {
+            dealloc(handle)
+        }
+    }
+}
+
 public class HandleWrap {
     
     private var onCloseHandlers = [() -> ()]()
     
-    internal let handlePtr: UnsafeMutablePointer<uv_handle_t>
+    internal var handlePtr: UnsafeMutablePointer<uv_handle_t>
     
     public init(_ handlePtr: UnsafeMutablePointer<uv_handle_t>){
         self.handlePtr = handlePtr
@@ -49,7 +60,7 @@ public class HandleWrap {
         return false
     }
     
-    public func onClose(_ onClose: () -> ()){
+    public func onClose(_ onClose: @escaping () -> ()){
         self.onCloseHandlers.append(onClose)
     }
     

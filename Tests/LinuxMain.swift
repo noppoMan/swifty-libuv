@@ -1,5 +1,5 @@
 import XCTest
-@testable import SwiftyLibuvTestSuite
+@testable import SwiftyLibuvTests
 
 XCTMain([
      testCase(SwiftyLibuvTests.allTests),

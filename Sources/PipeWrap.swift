@@ -14,13 +14,13 @@ import CLibUv
 public class PipeWrap: StreamWrap {
     
     public init(pipe: UnsafeMutablePointer<uv_pipe_t>){
-        super.init(UnsafeMutablePointer<uv_stream_t>(pipe))
+        super.init(pipe.cast(to: UnsafeMutablePointer<uv_stream_t>.self))
     }
     
     public init(loop: Loop = Loop.defaultLoop, ipcEnable: Bool = false){
-        let pipe = UnsafeMutablePointer<uv_pipe_t>(allocatingCapacity: sizeof(uv_pipe_t.self))
+        let pipe = UnsafeMutablePointer<uv_pipe_t>.allocate(capacity: MemoryLayout<uv_pipe_t>.size)
         uv_pipe_init(loop.loopPtr, pipe, ipcEnable ? 1 : 0)
-        super.init(UnsafeMutablePointer<uv_stream_t>(pipe))
+        super.init(pipe.cast(to: UnsafeMutablePointer<uv_stream_t>.self))
     }
     
     /**
@@ -37,7 +37,7 @@ public class PipeWrap: StreamWrap {
         let r = uv_pipe_bind(pipePtr, sockName)
         
         if r < 0 {
-            throw Error.uvError(code: r)
+            throw SwiftyLibUvError.uvError(code: r)
         }
     }
     
@@ -49,10 +49,10 @@ public class PipeWrap: StreamWrap {
                 return
             }
             
-            let onConnection: ((Void) throws -> Void) -> Void = releaseVoidPointer(stream.pointee.data)!
+            let onConnection: ((Void) throws -> Void) -> Void = releaseVoidPointer(stream.pointee.data)
             guard status >= 0 else {
                 return onConnection {
-                    throw Error.uvError(code: status)
+                    throw SwiftyLibUvError.uvError(code: status)
                 }
             }
             
@@ -61,7 +61,7 @@ public class PipeWrap: StreamWrap {
         
         if result < 0 {
             onConnection {
-                throw Error.uvError(code: result)
+                throw SwiftyLibUvError.uvError(code: result)
             }
         }
     }
@@ -73,7 +73,7 @@ public class PipeWrap: StreamWrap {
      - parameter onConnect: Will be called when the connection is succeeded or failed
      */
     public func connect(_ sockName: String, onConnect: ((Void) throws -> StreamWrap) -> Void){
-        let req = UnsafeMutablePointer<uv_connect_t>(allocatingCapacity: sizeof(uv_connect_t.self))
+        let req = UnsafeMutablePointer<uv_connect_t>.allocate(capacity: MemoryLayout<uv_connect_t>.size)
         
         req.pointee.data = retainedVoidPointer(onConnect)
         
@@ -81,15 +81,15 @@ public class PipeWrap: StreamWrap {
             guard let req = req else {
                 return
             }
-            let onConnect: ((Void) throws -> StreamWrap) -> Void = releaseVoidPointer(req.pointee.data)!
+            let onConnect: ((Void) throws -> StreamWrap) -> Void = releaseVoidPointer(req.pointee.data)
             if status < 0 {
                 onConnect {
-                    throw Error.uvError(code: status)
+                    throw SwiftyLibUvError.uvError(code: status)
                 }
             }
             
             onConnect {
-                StreamWrap(UnsafeMutablePointer<uv_stream_t>(req))
+                StreamWrap(req.cast(to: UnsafeMutablePointer<uv_stream_t>.self))
             }
         }
     }
