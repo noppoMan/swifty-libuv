@@ -14,4 +14,4 @@ install:
 script:
   - make debug
   - make
-  - swift test
+  - make test
