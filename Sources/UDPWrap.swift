@@ -77,13 +77,15 @@ public class UDPWrap: HandleWrap {
     }
     
     public func send(bytes data: [Int8], addr: Address, onSend: ((Void) throws -> Void) -> Void = { _ in }) {
-        let bytes = UnsafeMutablePointer<Int8>(mutating: data)
-        sendBytes(bytes, length: UInt32(data.count), addr: addr, onSend: onSend)
+        data.withUnsafeBufferPointer {
+            sendBytes(UnsafeMutablePointer(mutating: $0.baseAddress!), length: UInt32($0.count), addr: addr, onSend: onSend)
+        }
     }
     
     public func send(buffer data: Buffer, addr: Address, onSend: ((Void) throws -> Void) -> Void =  { _ in }) {
-        let bytes = UnsafeMutablePointer<Int8>(mutating: data.bytes.map({Int8(bitPattern: $0)}))
-        sendBytes(bytes, length: UInt32(data.bytes.count), addr: addr, onSend: onSend)
+        data.bytes.map({CChar($0)}).withUnsafeBufferPointer({
+            sendBytes(UnsafeMutablePointer(mutating: $0.baseAddress!), length: UInt32($0.count), addr: addr, onSend: onSend)
+        })
     }
     
     private func sendBytes(_ bytes: UnsafeMutablePointer<Int8>, length: UInt32, addr: Address, onSend: ((Void) throws -> Void) -> Void = {
@@ -145,10 +147,12 @@ public class UDPWrap: HandleWrap {
                 #endif
                 
                 let addr = Address(host: String(validatingUTF8: sender)!, port: port)
-                
-                let buf = Buffer(buffer: buf.pointee.base.cast(to: UnsafePointer<UInt8>.self), length: nread)
+                var buffer = Buffer()
+                for i in stride(from: 0, to: nread, by: 1) {
+                    buffer.append(buf.pointee.base[i])
+                }
                 onRecv {
-                    (buf, addr)
+                    (buffer, addr)
                 }
             }
         }
