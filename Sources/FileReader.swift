@@ -85,7 +85,7 @@ private func readNext(_ context: FileReaderContext){
     
     if r < 0 {
         fs_req_cleanup(readReq)
-        context.onRead(.error(SwiftyLibUvError.uvError(code: r)))
+        context.onRead(.error(UVError.rawUvError(code: r)))
     }
 }
 
@@ -100,7 +100,7 @@ private func onReadEach(_ req: UnsafeMutablePointer<uv_fs_t>?) {
     }
     
     if(req.pointee.result < 0) {
-        let e = SwiftyLibUvError.uvError(code: Int32(req.pointee.result))
+        let e = UVError.rawUvError(code: Int32(req.pointee.result))
         return context.onRead(.error(e))
     }
     

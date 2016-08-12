@@ -34,10 +34,6 @@ extension UVMembership {
 
 public class UDPWrap: HandleWrap {
     
-    public enum UDPWrapError: Error {
-        case eof
-    }
-    
     private var socket: UnsafeMutablePointer<uv_udp_t>
     
     public init(loop: Loop = Loop.defaultLoop) {
@@ -49,14 +45,14 @@ public class UDPWrap: HandleWrap {
     public func bind(_ addr: Address, flags: UVUdpFlags = .none) throws {
         let r = uv_udp_bind(socket, addr.address, flags.rawValue)
         if r < 0 {
-            throw SwiftyLibUvError.uvError(code: r)
+            throw UVError.rawUvError(code: r)
         }
     }
     
     public func setBroadcast(_ on: Bool) throws {
         let r = uv_udp_set_broadcast(socket, on ? 1: 0)
         if r < 0 {
-            throw SwiftyLibUvError.uvError(code: r)
+            throw UVError.rawUvError(code: r)
         }
     }
     
@@ -77,15 +73,13 @@ public class UDPWrap: HandleWrap {
     }
     
     public func send(bytes data: [Int8], addr: Address, onSend: ((Void) throws -> Void) -> Void = { _ in }) {
-        data.withUnsafeBufferPointer {
-            sendBytes(UnsafeMutablePointer(mutating: $0.baseAddress!), length: UInt32($0.count), addr: addr, onSend: onSend)
-        }
+        let bytePtr = UnsafeMutablePointer(mutating: UnsafeRawPointer(data).assumingMemoryBound(to: Int8.self))
+        sendBytes(bytePtr, length: UInt32(data.count), addr: addr, onSend: onSend)
     }
     
     public func send(buffer data: Buffer, addr: Address, onSend: ((Void) throws -> Void) -> Void =  { _ in }) {
-        data.bytes.map({CChar($0)}).withUnsafeBufferPointer({
-            sendBytes(UnsafeMutablePointer(mutating: $0.baseAddress!), length: UInt32($0.count), addr: addr, onSend: onSend)
-        })
+        let bytePtr = UnsafeMutablePointer(mutating: UnsafeRawPointer(data.bytes).assumingMemoryBound(to: Int8.self))
+        sendBytes(bytePtr, length: UInt32(data.bytes.count), addr: addr, onSend: onSend)
     }
     
     private func sendBytes(_ bytes: UnsafeMutablePointer<Int8>, length: UInt32, addr: Address, onSend: ((Void) throws -> Void) -> Void = {
@@ -99,14 +93,14 @@ public class UDPWrap: HandleWrap {
             let onSend: ((Void) throws -> Void) -> Void = releaseVoidPointer(req!.pointee.data)
             onSend {
                 if status > 0 {
-                    throw SwiftyLibUvError.uvError(code: status)
+                    throw UVError.rawUvError(code: status)
                 }
             }
         }
         
         if r < 0 {
             onSend {
-                throw SwiftyLibUvError.uvError(code: r)
+                throw UVError.rawUvError(code: r)
             }
         }
     }
@@ -127,11 +121,11 @@ public class UDPWrap: HandleWrap {
             
             if (nread == Int(UV_EOF.rawValue)) {
                 onRecv {
-                    throw UDPWrapError.eof
+                    throw StreamWrapError.eof
                 }
             } else if (nread < 0) {
                 onRecv {
-                    throw SwiftyLibUvError.uvError(code: Int32(nread))
+                    throw UVError.rawUvError(code: Int32(nread))
                 }
             } else {
                 req.pointee.data = retainedVoidPointer(onRecv)
@@ -147,19 +141,15 @@ public class UDPWrap: HandleWrap {
                 #endif
                 
                 let addr = Address(host: String(validatingUTF8: sender)!, port: port)
-                var buffer = Buffer()
-                for i in stride(from: 0, to: nread, by: 1) {
-                    buffer.append(buf.pointee.base[i])
-                }
                 onRecv {
-                    (buffer, addr)
+                    (Buffer(buf.pointee.base, length: nread), addr)
                 }
             }
         }
         
         if r < 0 {
             onRecv {
-                throw SwiftyLibUvError.uvError(code: r)
+                throw UVError.rawUvError(code: r)
             }
         }
     }
@@ -169,7 +159,7 @@ public class UDPWrap: HandleWrap {
         
         let r = uv_udp_recv_stop(socket)
         if r < 0 {
-            throw SwiftyLibUvError.uvError(code: r)
+            throw UVError.rawUvError(code: r)
         }
     }
     

@@ -11,18 +11,18 @@ import CLibUv
 /**
  Common Error enum for Suv
  */
-public enum SwiftyLibUvError: Error, CustomStringConvertible {
+public enum UVError: Error, CustomStringConvertible {
     // Error from libuv's errorno
-    case uvError(code: Int32)
+    case rawUvError(code: Int32)
 }
 
-extension SwiftyLibUvError {
+extension UVError {
     /**
      Returns errorno for uvError
      */
     public var errorno: uv_errno_t? {
         switch(self) {
-        case .uvError(let code):
+        case .rawUvError(let code):
             return uv_errno_t(code)
         }
     }
@@ -32,7 +32,7 @@ extension SwiftyLibUvError {
      */
     public var type: String {
         switch(self) {
-        case .uvError(let code):
+        case .rawUvError(let code):
             return String(validatingUTF8: uv_err_name(code)) ??  "UNKNOWN"
         }
     }
@@ -42,7 +42,7 @@ extension SwiftyLibUvError {
      */
     public var message: String {
         switch(self) {
-        case .uvError(let code):
+        case .rawUvError(let code):
             return String(validatingUTF8: uv_strerror(code)) ?? "Unknow Error"
         }
     }

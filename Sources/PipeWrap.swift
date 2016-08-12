@@ -37,7 +37,7 @@ public class PipeWrap: StreamWrap {
         let r = uv_pipe_bind(pipePtr, sockName)
         
         if r < 0 {
-            throw SwiftyLibUvError.uvError(code: r)
+            throw UVError.rawUvError(code: r)
         }
     }
     
@@ -52,7 +52,7 @@ public class PipeWrap: StreamWrap {
             let onConnection: ((Void) throws -> Void) -> Void = releaseVoidPointer(stream.pointee.data)
             guard status >= 0 else {
                 return onConnection {
-                    throw SwiftyLibUvError.uvError(code: status)
+                    throw UVError.rawUvError(code: status)
                 }
             }
             
@@ -61,7 +61,7 @@ public class PipeWrap: StreamWrap {
         
         if result < 0 {
             onConnection {
-                throw SwiftyLibUvError.uvError(code: result)
+                throw UVError.rawUvError(code: result)
             }
         }
     }
@@ -84,7 +84,7 @@ public class PipeWrap: StreamWrap {
             let onConnect: ((Void) throws -> StreamWrap) -> Void = releaseVoidPointer(req.pointee.data)
             if status < 0 {
                 onConnect {
-                    throw SwiftyLibUvError.uvError(code: status)
+                    throw UVError.rawUvError(code: status)
                 }
             }
             

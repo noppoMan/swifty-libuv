@@ -39,7 +39,7 @@ public class FSWrap {
         let r = uv_fs_unlink(loop.loopPtr, req, path, nil)
         fs_req_cleanup(req)
         if r < 0 {
-            throw SwiftyLibUvError.uvError(code: r)
+            throw UVError.rawUvError(code: r)
         }
     }
     
@@ -133,7 +133,7 @@ public class FSWrap {
             
             if(req.pointee.result < 0) {
                 return ctx.onOpen {
-                    throw SwiftyLibUvError.uvError(code: Int32(req.pointee.result))
+                    throw UVError.rawUvError(code: Int32(req.pointee.result))
                 }
             }
             
@@ -145,7 +145,7 @@ public class FSWrap {
         if r < 0 {
             fs_req_cleanup(req)
             completion {
-                throw SwiftyLibUvError.uvError(code: r)
+                throw UVError.rawUvError(code: r)
             }
         }
     }

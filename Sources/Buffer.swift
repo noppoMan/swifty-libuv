@@ -25,10 +25,10 @@ public struct Buffer {
         self.bytes = bytes
     }
     
-    public init(buffer buf: UnsafePointer<UInt8>, length: Int) {
+    public init(_ buf: UnsafeMutablePointer<Int8>, length: Int) {
         var bytes: [UInt8] = []
         for i in stride(from: 0, to: length, by: 1) {
-            bytes.append(buf[i])
+            bytes.append(UInt8(bitPattern: buf[i]))
         }
         self.bytes = bytes
     }

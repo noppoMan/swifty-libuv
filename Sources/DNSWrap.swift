@@ -92,7 +92,7 @@ func getaddrinfo_cb(req: UnsafeMutablePointer<uv_getaddrinfo_t>?, status: Int32,
     
     if status < 0 {
         return context.completion {
-            throw SwiftyLibUvError.uvError(code: status)
+            throw UVError.rawUvError(code: status)
         }
     }
     
@@ -144,7 +144,7 @@ public class DNS {
                 dealloc(req)
             }
             completion {
-                throw SwiftyLibUvError.uvError(code: r)
+                throw UVError.rawUvError(code: r)
             }
         }
         

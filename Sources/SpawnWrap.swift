@@ -230,7 +230,7 @@ public class SpawnWrap {
         let r = uv_spawn(loop, childReq, options)
         if r < 0 {
             close_handle(childReq)
-            throw SwiftyLibUvError.uvError(code: r)
+            throw UVError.rawUvError(code: r)
         }
         
         proc.pid = childReq.pointee.pid

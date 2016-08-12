@@ -96,7 +96,7 @@ private func attemptWrite(_ context: FileWriterContext){
                 fs_req_cleanup(writeReq)
             }
             context.onWrite {
-                throw SwiftyLibUvError.uvError(code: r)
+                throw UVError.rawUvError(code: r)
             }
             return
         }
@@ -112,7 +112,7 @@ private func onWriteEach(_ req: UnsafeMutablePointer<uv_fs_t>){
     
     if(req.pointee.result < 0) {
         return context.onWrite {
-            throw SwiftyLibUvError.uvError(code: Int32(req.pointee.result))
+            throw UVError.rawUvError(code: Int32(req.pointee.result))
         }
     }
     
