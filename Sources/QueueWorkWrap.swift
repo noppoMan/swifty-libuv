@@ -8,14 +8,12 @@
 
 import CLibUv
 
-private typealias WorkQueueTask = () -> ()
-
 private func work_cb(req: UnsafeMutablePointer<uv_work_t>?) {
     guard let req = req else {
         return
     }
-    let ctx: QueueWorkerContext = releaseVoidPointer(req.pointee.data)
-    ctx.workCB()
+    let ctx: QueueWorkContext = releaseVoidPointer(req.pointee.data)
+    ctx.workCallback(ctx)
     req.pointee.data = retainedVoidPointer(ctx)
 }
 
@@ -28,17 +26,20 @@ private func after_work_cb(req: UnsafeMutablePointer<uv_work_t>?, status: Int32)
         dealloc(req)
     }
     
-    let ctx: QueueWorkerContext = releaseVoidPointer(req.pointee.data)
-    ctx.afterWorkCB()
+    let ctx: QueueWorkContext = releaseVoidPointer(req.pointee.data)
+    ctx.afterWorkCallback(ctx)
 }
 
-private struct QueueWorkerContext {
-    let workCB: () -> ()
-    let afterWorkCB: () -> ()
+public class QueueWorkContext {
+    public let workCallback: (QueueWorkContext) -> Void
     
-    init(workCB: @escaping () -> (), afterWorkCB: @escaping () -> ()) {
-        self.workCB = workCB
-        self.afterWorkCB = afterWorkCB
+    public let afterWorkCallback: (QueueWorkContext) -> Void
+    
+    public var storage: [String: Any] = [:]
+    
+    public init(workCallback: @escaping (QueueWorkContext) -> Void, afterWorkCallback: @escaping (QueueWorkContext) -> Void) {
+        self.workCallback = workCallback
+        self.afterWorkCallback = afterWorkCallback
     }
 }
 
@@ -46,19 +47,17 @@ public class QueueWorkWrap {
     
     let req: UnsafeMutablePointer<uv_work_t>
     
-    public var workCallback: (Void) -> Void = { _ in }
-    
-    public var afterWorkCallback: (Void) -> Void = { _ in }
-    
     let loop: Loop
     
-    public init(loop: Loop = Loop.defaultLoop) {
+    private let context: QueueWorkContext
+    
+    public init(loop: Loop = Loop.defaultLoop, context: QueueWorkContext) {
         self.loop = loop
         self.req = UnsafeMutablePointer<uv_work_t>.allocate(capacity: MemoryLayout<uv_work_t>.size)
+        self.context = context
     }
     
     public func execute(){
-        let context = QueueWorkerContext(workCB: workCallback, afterWorkCB: afterWorkCallback)
         req.pointee.data = retainedVoidPointer(context)
         uv_queue_work(loop.loopPtr, req, work_cb, after_work_cb)
     }
