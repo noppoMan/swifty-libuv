@@ -29,11 +29,7 @@ public extension CommandLine {
      Returns environment variables
      */
     public static var env: [String: String] {
-        #if os(Linux)
-            return ProcessInfo.processInfo().environment
-        #else
-            return ProcessInfo.processInfo.environment
-        #endif
+        return ProcessInfo.processInfo.environment
     }
     
     /**
