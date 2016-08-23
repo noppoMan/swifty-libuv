@@ -80,7 +80,7 @@ private func readNext(_ context: FileReaderContext){
     context.buf = uv_buf_init(UnsafeMutablePointer<Int8>.allocate(capacity: FileReader.upTo), UInt32(FileReader.upTo))
     
     readReq.pointee.data = retainedVoidPointer(context)
-    let r = uv_fs_read(context.loop.loopPtr, readReq, uv_file(context.fd), &context.buf!, 1, context.bytesRead, onReadEach)
+    let r = uv_fs_read(context.loop.loopPtr, readReq, uv_file(context.fd), &context.buf!, 1, -1, onReadEach)
     
     
     if r < 0 {
