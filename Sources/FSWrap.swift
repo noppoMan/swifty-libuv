@@ -81,12 +81,9 @@ public class FSWrap {
             data: data,
             offset: offset,
             length: length,
-            position: position
-        ) { result in
-            completion {
-                _ = try result()
-            }
-        }
+            position: position,
+            completion: completion
+        )
         writer.start()
     }
     
