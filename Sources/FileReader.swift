@@ -14,14 +14,8 @@
 
 import CLibUv
 
-public enum FsReadResult {
-    case data(Buffer)
-    case end(Int)
-    case error(Error)
-}
-
 private class FileReaderContext {
-    var onRead: (FsReadResult) -> Void = {_ in }
+    var onRead: ((Void) throws -> Buffer) -> Void = { _ in }
     
     var bytesRead: Int64 = 0
     
@@ -42,7 +36,7 @@ private class FileReaderContext {
      */
     var position: Int
     
-    init(loop: Loop = Loop.defaultLoop, fd: Int32, length: Int? = nil, position: Int, completion: @escaping (FsReadResult) -> Void){
+    init(loop: Loop = Loop.defaultLoop, fd: Int32, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Buffer) -> Void){
         self.loop = loop
         self.fd = fd
         self.position = position
@@ -58,7 +52,7 @@ public class FileReader {
     
     private let context: FileReaderContext
     
-    public init(loop: Loop = Loop.defaultLoop, fd: Int32, offset: Int = 0, length: Int? = nil, position: Int, completion: @escaping (FsReadResult) -> Void){
+    public init(loop: Loop = Loop.defaultLoop, fd: Int32, offset: Int = 0, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Buffer) -> Void){
         context = FileReaderContext(
             loop: loop,
             fd: fd,
@@ -85,7 +79,9 @@ private func readNext(_ context: FileReaderContext){
     
     if r < 0 {
         fs_req_cleanup(readReq)
-        context.onRead(.error(UVError.rawUvError(code: r)))
+        context.onRead {
+            throw UVError.rawUvError(code: r)
+        }
     }
 }
 
@@ -94,25 +90,31 @@ private func onReadEach(_ req: UnsafeMutablePointer<uv_fs_t>?) {
         return
     }
     
-    let context: FileReaderContext = releaseVoidPointer(req.pointee.data)
     defer {
         fs_req_cleanup(req)
     }
     
+    let context: FileReaderContext = releaseVoidPointer(req.pointee.data)
+    
     if(req.pointee.result < 0) {
-        let e = UVError.rawUvError(code: Int32(req.pointee.result))
-        return context.onRead(.error(e))
+        return context.onRead {
+            throw UVError.rawUvError(code: Int32(req.pointee.result))
+        }
     }
     
     var buf = Buffer()
     for i in stride(from: 0, to: req.pointee.result, by: 1) {
         buf.append(context.buf!.base[i])
     }
-    context.onRead(.data(buf))
+    
     context.bytesRead += req.pointee.result
     
-    if(req.pointee.result < FileReader.upTo) {
-        return context.onRead(.end(Int(context.bytesRead)))
+    context.onRead {
+        buf
+    }
+    
+    if req.pointee.result < FileReader.upTo {
+        return
     }
     
     readNext(context)

@@ -57,25 +57,9 @@ public class FSWrap {
             loop: loop,
             fd: fd,
             length: length,
-            position: position
-        ) { res in
-            switch(res) {
-            case .error(let e):
-                completion {
-                    throw e
-                }
-            case .data(let buf):
-                completion {
-                    return buf
-                }
-            case .end(let pos):
-                if pos == 0 {
-                    completion {
-                        []
-                    }
-                }
-            }
-        }
+            position: position,
+            completion: completion
+        )
         reader.start()
     }
     
