@@ -49,7 +49,7 @@ public class TimerWrap {
     
     public let mode: TimerMode
     
-    public private(set) var tick: UInt64 = 0
+    public private(set) var delay: UInt64 = 0
     
     private let handle: UnsafeMutablePointer<uv_timer_t>
     
@@ -61,9 +61,9 @@ public class TimerWrap {
      - parameter mode: .Interval or Timeout
      - parameter tick: Micro sec for timer tick.
      */
-    public init(loop: Loop = Loop.defaultLoop, mode: TimerMode = .timeout, tick: UInt64){
+    public init(loop: Loop = Loop.defaultLoop, mode: TimerMode = .timeout, delay: UInt64){
         self.mode = mode
-        self.tick = tick
+        self.delay = delay
         self.handle = UnsafeMutablePointer<uv_timer_t>.allocate(capacity: MemoryLayout<uv_timer_t>.size)
         uv_timer_init(loop.loopPtr, handle)
     }
@@ -104,9 +104,9 @@ public class TimerWrap {
         
         switch(mode) {
         case .timeout:
-            uv_timer_start(handle, timer_start_cb, UInt64(tick), 0)
+            uv_timer_start(handle, timer_start_cb, UInt64(delay), 0)
         case .interval:
-            uv_timer_start(handle, timer_start_cb, 0, UInt64(tick))
+            uv_timer_start(handle, timer_start_cb, 0, UInt64(delay))
         }
         state = .running
         initalized = true
