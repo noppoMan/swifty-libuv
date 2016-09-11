@@ -17,7 +17,7 @@ import CLibUv
 private class FileWriterContext {
     var writeReq: UnsafeMutablePointer<uv_fs_t>? = nil
     
-    var onWrite: ((Void) throws -> Int) -> Void = {_ in }
+    var onWrite: ((Void) throws -> Void) -> Void = {_ in }
     
     var bytesWritten: Int64 = 0
     
@@ -39,7 +39,7 @@ private class FileWriterContext {
         return position + Int(bytesWritten)
     }
     
-    init(loop: Loop = Loop.defaultLoop, fd: Int32, data: Buffer, offset: Int, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Int) -> Void){
+    init(loop: Loop = Loop.defaultLoop, fd: Int32, data: Buffer, offset: Int, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Void) -> Void){
         self.loop = loop
         self.fd = fd
         self.data = data
@@ -54,7 +54,7 @@ public class FileWriter {
     
     private var context: FileWriterContext
     
-    public init(loop: Loop = Loop.defaultLoop, fd: Int32, data: Buffer, offset: Int, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Int) -> Void){
+    public init(loop: Loop = Loop.defaultLoop, fd: Int32, data: Buffer, offset: Int, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Void) -> Void){
         context = FileWriterContext(
             loop: loop,
             fd: fd,
@@ -68,9 +68,7 @@ public class FileWriter {
     
     public func start(){
         if(context.data.bytes.count <= 0) {
-            return context.onWrite { [unowned self] in
-                0+self.context.offset
-            }
+            return context.onWrite {}
         }
         attemptWrite(context)
     }
@@ -117,17 +115,13 @@ private func onWriteEach(_ req: UnsafeMutablePointer<uv_fs_t>){
     }
     
     if(req.pointee.result == 0) {
-        return context.onWrite {
-            context.curPos
-        }
+        return context.onWrite {}
     }
     
     context.bytesWritten += req.pointee.result
     
     if Int(context.bytesWritten) >= Int(context.data.bytes.count) {
-        return context.onWrite {
-            context.curPos
-        }
+        return context.onWrite {}
     }
     
     attemptWrite(context)
