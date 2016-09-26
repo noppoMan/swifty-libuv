@@ -13,9 +13,10 @@
 #endif
 
 import CLibUv
+import Foundation
 
 private class FileReaderContext {
-    var onRead: ((Void) throws -> Buffer) -> Void = { _ in }
+    var onRead: ((Void) throws -> Data) -> Void = { _ in }
     
     var bytesRead: Int64 = 0
     
@@ -36,7 +37,7 @@ private class FileReaderContext {
      */
     var position: Int
     
-    init(loop: Loop = Loop.defaultLoop, fd: Int32, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Buffer) -> Void){
+    init(loop: Loop = Loop.defaultLoop, fd: Int32, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Data) -> Void){
         self.loop = loop
         self.fd = fd
         self.position = position
@@ -52,7 +53,7 @@ public class FileReader {
     
     private let context: FileReaderContext
     
-    public init(loop: Loop = Loop.defaultLoop, fd: Int32, offset: Int = 0, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Buffer) -> Void){
+    public init(loop: Loop = Loop.defaultLoop, fd: Int32, offset: Int = 0, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Data) -> Void){
         context = FileReaderContext(
             loop: loop,
             fd: fd,
@@ -102,15 +103,10 @@ private func onReadEach(_ req: UnsafeMutablePointer<uv_fs_t>?) {
         }
     }
     
-    var buf = Buffer()
-    for i in stride(from: 0, to: req.pointee.result, by: 1) {
-        buf.append(context.buf!.base[i])
-    }
-    
     context.bytesRead += req.pointee.result
     
     context.onRead {
-        buf
+        Data(bytes: context.buf!.base, count: req.pointee.result)
     }
     
     if req.pointee.result < FileReader.upTo {

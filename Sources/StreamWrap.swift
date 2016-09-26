@@ -7,10 +7,7 @@
 //
 
 import CLibUv
-
-public enum SocketState {
-    case Ready, Connecting, Connected, Closing, Closed
-}
+import Foundation
 
 /**
  Base wrapper class of Stream and Handle
@@ -139,23 +136,14 @@ extension StreamWrap {
     /**
      Write data to stream. Buffers are written in order
      
-     - parameter data: Int8 Array bytes to write
-     - parameter onWrite: Completion handler
-     */
-    public func write(bytes data: [Int8], onWrite: ((Void) throws -> Void) -> Void = { _ in }) {
-        let bytePtr = UnsafeMutablePointer(mutating: UnsafeRawPointer(data).assumingMemoryBound(to: Int8.self))
-        writeBytes(bytePtr, length: UInt32(data.count), onWrite: onWrite)
-    }
-    
-    /**
-     Write data to stream. Buffers are written in order
-     
      - parameter data: Buffer to write
      - parameter onWrite: Completion handler
      */
-    public func write(buffer data: Buffer, onWrite: ((Void) throws -> Void) -> Void) {
-        let bytePtr = UnsafeMutablePointer(mutating: UnsafeRawPointer(data.bytes).assumingMemoryBound(to: Int8.self))
-        writeBytes(bytePtr, length: UInt32(data.bytes.count), onWrite: onWrite)
+    public func write(buffer data: Data, onWrite: ((Void) throws -> Void) -> Void) {
+        let bytePtr = data.withUnsafeBytes { (bytes: UnsafePointer<Int8>) in
+            UnsafeMutablePointer(mutating: UnsafeRawPointer(bytes).assumingMemoryBound(to: Int8.self))
+        }
+        writeBytes(bytePtr, length: UInt32(data.count), onWrite: onWrite)
     }
     
     private func writeBytes(_ bytes: UnsafeMutablePointer<Int8>, length: UInt32, onWrite: ((Void) throws -> Void) -> Void = { _ in }){
@@ -187,18 +175,6 @@ extension StreamWrap {
 
 
 extension StreamWrap {
-    /**
-     Stop reading data from the stream
-     */
-    public func stop() throws {
-        if isClosing() { return }
-        
-        let r = uv_read_stop(streamPtr)
-        if r < 0 {
-            throw UVError.rawUvError(code: r)
-        }
-    }
-    
     /**
      Extended read function for reading handles over a pipe
      
@@ -264,7 +240,7 @@ extension StreamWrap {
      
      - parameter callback: Completion handler
      */
-    public func read(_ callback: ((Void) throws -> Buffer) -> Void) {
+    public func read(_ callback: ((Void) throws -> Data) -> Void) {
         streamPtr.pointee.data = retainedVoidPointer(callback)
         
         let r = uv_read_start(streamPtr, alloc_buffer) { stream, nread, buf in
@@ -276,7 +252,7 @@ extension StreamWrap {
                 dealloc(buf.pointee.base, capacity: nread)
             }
             
-            let onRead: ((Void) throws -> Buffer) -> Void = releaseVoidPointer(stream.pointee.data)
+            let onRead: ((Void) throws -> Data) -> Void = releaseVoidPointer(stream.pointee.data)
             
             if (nread == Int(UV_EOF.rawValue)) {
                 onRead {
@@ -289,11 +265,7 @@ extension StreamWrap {
             } else {
                 stream.pointee.data = retainedVoidPointer(onRead)
                 onRead {
-                    var buffer = Buffer()
-                    for i in stride(from: 0, to: nread, by: 1) {
-                        buffer.append(buf.pointee.base[i])
-                    }
-                    return buffer
+                    Data(bytes: buf.pointee.base, count: nread)
                 }
             }
         }
@@ -302,6 +274,20 @@ extension StreamWrap {
             callback {
                 throw UVError.rawUvError(code: r)
             }
+        }
+    }
+}
+
+extension StreamWrap {
+    /**
+     Stop reading data from the stream
+     */
+    public func stop() throws {
+        if isClosing() { return }
+        
+        let r = uv_read_stop(streamPtr)
+        if r < 0 {
+            throw UVError.rawUvError(code: r)
         }
     }
 }

@@ -72,14 +72,11 @@ public class UDPWrap: HandleWrap {
         uv_udp_set_membership(socket, multicastAddr.withCString{$0}, interfaceAddr.withCString{$0}, membership.rawValue)
     }
     
-    public func send(bytes data: [Int8], addr: Address, onSend: ((Void) throws -> Void) -> Void = { _ in }) {
-        let bytePtr = UnsafeMutablePointer(mutating: UnsafeRawPointer(data).assumingMemoryBound(to: Int8.self))
+    public func send(buffer data: Data, addr: Address, onSend: ((Void) throws -> Void) -> Void =  { _ in }) {
+        let bytePtr = data.withUnsafeBytes { (bytes: UnsafePointer<Int8>) in
+            UnsafeMutablePointer(mutating: UnsafeRawPointer(bytes).assumingMemoryBound(to: Int8.self))
+        }
         sendBytes(bytePtr, length: UInt32(data.count), addr: addr, onSend: onSend)
-    }
-    
-    public func send(buffer data: Buffer, addr: Address, onSend: ((Void) throws -> Void) -> Void =  { _ in }) {
-        let bytePtr = UnsafeMutablePointer(mutating: UnsafeRawPointer(data.bytes).assumingMemoryBound(to: Int8.self))
-        sendBytes(bytePtr, length: UInt32(data.bytes.count), addr: addr, onSend: onSend)
     }
     
     private func sendBytes(_ bytes: UnsafeMutablePointer<Int8>, length: UInt32, addr: Address, onSend: ((Void) throws -> Void) -> Void = {
@@ -105,7 +102,7 @@ public class UDPWrap: HandleWrap {
         }
     }
     
-    public func recv(onRecv: ((Void) throws -> (Buffer, Address)) -> Void) {
+    public func recv(onRecv: ((Void) throws -> (Data, Address)) -> Void) {
         socket.pointee.data = retainedVoidPointer(onRecv)
         
         let r = uv_udp_recv_start(socket, alloc_buffer) { req, nread, buf, sockaddr, flags in
@@ -117,7 +114,7 @@ public class UDPWrap: HandleWrap {
                 dealloc(buf.pointee.base, capacity: nread)
             }
             
-            let onRecv: ((Void) throws -> (Buffer, Address)) -> Void = releaseVoidPointer(req.pointee.data)
+            let onRecv: ((Void) throws -> (Data, Address)) -> Void = releaseVoidPointer(req.pointee.data)
             
             if (nread == Int(UV_EOF.rawValue)) {
                 onRecv {
@@ -142,7 +139,7 @@ public class UDPWrap: HandleWrap {
                 
                 let addr = Address(host: String(validatingUTF8: sender)!, port: port)
                 onRecv {
-                    (Buffer(buf.pointee.base, length: nread), addr)
+                    (Data(bytes: buf.pointee.base, count: nread), addr)
                 }
             }
         }

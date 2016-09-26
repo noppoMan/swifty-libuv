@@ -13,6 +13,7 @@
 #endif
 
 import CLibUv
+import Foundation
 
 private class FileWriterContext {
     var writeReq: UnsafeMutablePointer<uv_fs_t>? = nil
@@ -21,7 +22,7 @@ private class FileWriterContext {
     
     var bytesWritten: Int64 = 0
     
-    var data: Buffer
+    var data: Data
     
     var buf: uv_buf_t? = nil
     
@@ -39,7 +40,7 @@ private class FileWriterContext {
         return position + Int(bytesWritten)
     }
     
-    init(loop: Loop = Loop.defaultLoop, fd: Int32, data: Buffer, offset: Int, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Void) -> Void){
+    init(loop: Loop = Loop.defaultLoop, fd: Int32, data: Data, offset: Int, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Void) -> Void){
         self.loop = loop
         self.fd = fd
         self.data = data
@@ -54,7 +55,7 @@ public class FileWriter {
     
     private var context: FileWriterContext
     
-    public init(loop: Loop = Loop.defaultLoop, fd: Int32, data: Buffer, offset: Int, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Void) -> Void){
+    public init(loop: Loop = Loop.defaultLoop, fd: Int32, data: Data, offset: Int, length: Int? = nil, position: Int, completion: @escaping ((Void) throws -> Void) -> Void){
         context = FileWriterContext(
             loop: loop,
             fd: fd,
@@ -67,7 +68,7 @@ public class FileWriter {
     }
     
     public func start(){
-        if(context.data.bytes.count <= 0) {
+        if(context.data.count <= 0) {
             return context.onWrite {}
         }
         attemptWrite(context)
@@ -77,8 +78,11 @@ public class FileWriter {
 private func attemptWrite(_ context: FileWriterContext){
     var writeReq = UnsafeMutablePointer<uv_fs_t>.allocate(capacity: MemoryLayout<uv_fs_t>.size)
     
-    var bytes = context.data.bytes.map { Int8(bitPattern: $0) }
-    context.buf = uv_buf_init(&bytes, UInt32(context.data.bytes.count))
+    var bytes = context.data.withUnsafeBytes { (bytes: UnsafePointer<Int8>) in
+        UnsafeMutablePointer(mutating: UnsafeRawPointer(bytes).assumingMemoryBound(to: Int8.self))
+    }
+    
+    context.buf = uv_buf_init(bytes, UInt32(context.data.count))
     
     withUnsafePointer(to: &context.buf!) {
         writeReq.pointee.data = retainedVoidPointer(context)
@@ -120,7 +124,7 @@ private func onWriteEach(_ req: UnsafeMutablePointer<uv_fs_t>){
     
     context.bytesWritten += req.pointee.result
     
-    if Int(context.bytesWritten) >= Int(context.data.bytes.count) {
+    if Int(context.bytesWritten) >= Int(context.data.count) {
         return context.onWrite {}
     }
     
