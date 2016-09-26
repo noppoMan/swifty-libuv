@@ -13,6 +13,7 @@
 #endif
 
 import CLibUv
+import Foundation
 
 private struct FSContext {
     var onOpen: ((Void) throws -> Int32) -> Void = {_ in}
@@ -52,7 +53,7 @@ public class FSWrap {
      - parameter position: Not implemented yet
      - parameter completion: Completion handler
      */
-    public static func read(_ fd: Int32, loop: Loop = Loop.defaultLoop, length: Int? = nil, position: Int = 0, completion: @escaping ((Void) throws -> Buffer) -> Void){
+    public static func read(_ fd: Int32, loop: Loop = Loop.defaultLoop, length: Int? = nil, position: Int = 0, completion: @escaping ((Void) throws -> Data) -> Void){
         let reader = FileReader(
             loop: loop,
             fd: fd,
@@ -74,7 +75,7 @@ public class FSWrap {
      - parameter position: Position to start writing
      - parameter completion: Completion handler
      */
-    public static func write(_ fd: Int32, loop: Loop = Loop.defaultLoop, data: Buffer, offset: Int = 0, length: Int? = nil, position: Int = 0, completion: @escaping ((Void) throws -> Void) ->  Void){
+    public static func write(_ fd: Int32, loop: Loop = Loop.defaultLoop, data: Data, offset: Int = 0, length: Int? = nil, position: Int = 0, completion: @escaping ((Void) throws -> Void) ->  Void){
         let writer = FileWriter(
             loop: loop,
             fd: fd,
