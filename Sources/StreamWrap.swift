@@ -12,7 +12,14 @@ import Foundation
 /**
  Base wrapper class of Stream and Handle
  */
-public class StreamWrap: HandleWrap {    
+public class StreamWrap: HandleWrap {
+    
+    fileprivate var onRead: (Result<Data>) -> Void = { _ in }
+    
+    fileprivate var onRead2: (Result<PipeWrap>) -> Void = { _ in }
+    
+    fileprivate var onWrite: (Result<Void>) -> Void = { _ in }
+    
     /**
      Initialize with Pointer of the uv_stream_t
      - parameter stream: Pointer of the uv_stream_t
@@ -113,7 +120,7 @@ extension StreamWrap {
      - paramter  data: Buffer to write
      - parameter onWrite: Completion handler(Not implemented yet)
      */
-    public func write2(ipcPipe: PipeWrap, onWrite: @escaping ((Void) throws -> Void) -> Void = { _ in }){
+    public func write2(ipcPipe: PipeWrap, completion: @escaping (Result<Void>) -> Void = { _ in }){
         var dummy_buf = uv_buf_init(UnsafeMutablePointer<Int8>(mutating: [97]), 1)
         
         withUnsafePointer(to: &dummy_buf) {
@@ -126,9 +133,7 @@ extension StreamWrap {
             
             if r < 0 {
                 destroy_write_req(writeReq)
-                onWrite {
-                    throw UVError.rawUvError(code: r)
-                }
+                completion(.failure(UVError.rawUvError(code: r)))
             }
         }
     }
@@ -139,35 +144,31 @@ extension StreamWrap {
      - parameter data: Buffer to write
      - parameter onWrite: Completion handler
      */
-    public func write(buffer data: Data, onWrite: ((Void) throws -> Void) -> Void) {
+    public func write(_ data: Data, completion: @escaping (Result<Void>) -> Void = { _ in }) {
         let bytePtr = data.withUnsafeBytes { (bytes: UnsafePointer<Int8>) in
             UnsafeMutablePointer(mutating: UnsafeRawPointer(bytes).assumingMemoryBound(to: Int8.self))
         }
-        writeBytes(bytePtr, length: UInt32(data.count), onWrite: onWrite)
+        write(bytePtr, length: UInt32(data.count), completion: completion)
     }
     
-    private func writeBytes(_ bytes: UnsafeMutablePointer<Int8>, length: UInt32, onWrite: ((Void) throws -> Void) -> Void = { _ in }){
+    public func write(_ bytes: UnsafeMutablePointer<Int8>, length: UInt32, completion: @escaping (Result<Void>) -> Void = { _ in }){
         var data = uv_buf_init(bytes, length)
+        
+        self.onWrite = completion
         
         withUnsafePointer(to: &data) {
             let writeReq = UnsafeMutablePointer<uv_write_t>.allocate(capacity: MemoryLayout<uv_write_t>.size)
-            writeReq.pointee.data = retainedVoidPointer(onWrite)
+            writeReq.pointee.data = Unmanaged.passUnretained(self).toOpaque()
             
             let r = uv_write(writeReq, streamPtr, $0, 1) { req, _ in
-                guard let req = req else {
-                    return
-                }
-                
-                let onWrite: ((Void) throws -> Void) -> Void = releaseVoidPointer(req.pointee.data)
-                destroy_write_req(req)
-                onWrite {}
+                let stream: StreamWrap = Unmanaged.fromOpaque(req!.pointee.data).takeUnretainedValue()
+                destroy_write_req(req!)
+                stream.onWrite(.success())
             }
             
             if r < 0 {
                 destroy_write_req(writeReq)
-                onWrite {
-                    throw UVError.rawUvError(code: r)
-                }
+                onWrite(.failure(UVError.rawUvError(code: r)))
             }
         }
     }
@@ -181,57 +182,45 @@ extension StreamWrap {
      - parameter pendingType: uv_handle_type
      - parameter callback: Completion handler
      */
-    public func read2(pendingType: PendingType, callback: @escaping ((Void) throws -> PipeWrap) -> Void) {
-        
-        let onRead: ((Void) throws -> PipeWrap) -> Void = { getQueue in
-            callback {
-                let queue = try getQueue()
-                
+    public func read2(pendingType: PendingType, completion: @escaping (Result<PipeWrap>) -> Void) {
+        self.onRead2 = { result in
+            switch result {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success(let queue):
                 if uv_pipe_pending_count(queue.pipePtr) <= 0 {
-                    throw StreamWrapError.noPendingCount
+                    return completion(.failure(StreamWrapError.noPendingCount))
                 }
-                
+
                 if uv_pipe_pending_type(queue.pipePtr) != pendingType.rawValue {
-                    throw StreamWrapError.pendingTypeIsMismatched
+                    return completion(.failure(StreamWrapError.pendingTypeIsMismatched))
                 }
                 
-                return queue
+                completion(.success(queue))
             }
         }
         
-        streamPtr.pointee.data = retainedVoidPointer(onRead)
+        streamPtr.pointee.data = Unmanaged.passUnretained(self).toOpaque()
         
         let r = uv_read_start(streamPtr, alloc_buffer) { queue, nread, buf in
-            guard let queue = queue, let buf = buf else {
-                return
-            }
-            
             defer {
-                dealloc(buf.pointee.base, capacity: nread)
+                dealloc(buf!.pointee.base, capacity: nread)
             }
             
-            let callback: ((Void) throws -> PipeWrap) -> Void = releaseVoidPointer(queue.pointee.data)
+            let stream: StreamWrap = Unmanaged.fromOpaque(queue!.pointee.data).takeUnretainedValue()
             
             if (nread == Int(UV_EOF.rawValue)) {
-                callback {
-                    throw StreamWrapError.eof
-                }
+                stream.onRead2(.failure(StreamWrapError.eof))
             } else if (nread < 0) {
-                callback {
-                    throw UVError.rawUvError(code: Int32(nread))
-                }
+                stream.onRead2(.failure(UVError.rawUvError(code: Int32(nread))))
             } else {
-                queue.pointee.data = retainedVoidPointer(callback)
-                callback {
-                    PipeWrap(pipe: queue.cast(to: UnsafeMutablePointer<uv_pipe_t>.self))
-                }
+                let queue = PipeWrap(pipe: queue!.cast(to: UnsafeMutablePointer<uv_pipe_t>.self))
+                stream.onRead2(.success(queue))
             }
         }
         
         if r < 0 {
-            callback {
-                throw UVError.rawUvError(code: r)
-            }
+            completion(.failure(UVError.rawUvError(code: r)))
         }
     }
     
@@ -240,40 +229,28 @@ extension StreamWrap {
      
      - parameter callback: Completion handler
      */
-    public func read(_ callback: ((Void) throws -> Data) -> Void) {
-        streamPtr.pointee.data = retainedVoidPointer(callback)
+    public func read(_ completion: @escaping (Result<Data>) -> Void) {
+        self.onRead = completion
+        streamPtr.pointee.data = Unmanaged.passUnretained(self).toOpaque()
         
-        let r = uv_read_start(streamPtr, alloc_buffer) { stream, nread, buf in
-            guard let stream = stream, let buf = buf else {
-                return
-            }
-            
+        let r = uv_read_start(streamPtr, alloc_buffer) { streamPtr, nread, buf in
             defer {
-                dealloc(buf.pointee.base, capacity: nread)
+                dealloc(buf!.pointee.base, capacity: nread)
             }
             
-            let onRead: ((Void) throws -> Data) -> Void = releaseVoidPointer(stream.pointee.data)
+            let stream: StreamWrap = Unmanaged.fromOpaque(streamPtr!.pointee.data).takeUnretainedValue()
             
             if (nread == Int(UV_EOF.rawValue)) {
-                onRead {
-                    throw StreamWrapError.eof
-                }
+                stream.onRead(.failure(StreamWrapError.eof))
             } else if (nread < 0) {
-                onRead {
-                    throw UVError.rawUvError(code: Int32(nread))
-                }
+                stream.onRead(.failure(UVError.rawUvError(code: Int32(nread))))
             } else {
-                stream.pointee.data = retainedVoidPointer(onRead)
-                onRead {
-                    Data(bytes: buf.pointee.base, count: nread)
-                }
+                stream.onRead(.success(Data(bytes: buf!.pointee.base, count: nread)))
             }
         }
         
         if r < 0 {
-            callback {
-                throw UVError.rawUvError(code: r)
-            }
+            onRead(.failure(UVError.rawUvError(code: r)))
         }
     }
 }

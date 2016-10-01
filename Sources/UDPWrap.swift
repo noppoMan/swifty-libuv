@@ -36,6 +36,10 @@ public class UDPWrap: HandleWrap {
     
     private var socket: UnsafeMutablePointer<uv_udp_t>
     
+    private var onRecv: (Result<(Data, Address)>) -> Void = { _ in }
+    
+    private var onSend: (Result<Void>) -> Void = { _ in }
+    
     public init(loop: Loop = Loop.defaultLoop) {
         self.socket = UnsafeMutablePointer<uv_udp_t>.allocate(capacity: MemoryLayout<uv_udp_t>.size)
         uv_udp_init(loop.loopPtr, socket)
@@ -72,38 +76,36 @@ public class UDPWrap: HandleWrap {
         uv_udp_set_membership(socket, multicastAddr.withCString{$0}, interfaceAddr.withCString{$0}, membership.rawValue)
     }
     
-    public func send(buffer data: Data, addr: Address, onSend: ((Void) throws -> Void) -> Void =  { _ in }) {
+    public func send(buffer data: Data, addr: Address, completion: @escaping (Result<Void>) -> Void =  { _ in }) {
         let bytePtr = data.withUnsafeBytes { (bytes: UnsafePointer<Int8>) in
             UnsafeMutablePointer(mutating: UnsafeRawPointer(bytes).assumingMemoryBound(to: Int8.self))
         }
-        sendBytes(bytePtr, length: UInt32(data.count), addr: addr, onSend: onSend)
+        send(bytePtr, length: UInt32(data.count), addr: addr, completion: completion)
     }
     
-    private func sendBytes(_ bytes: UnsafeMutablePointer<Int8>, length: UInt32, addr: Address, onSend: ((Void) throws -> Void) -> Void = {
-        _ in }) {
-        
+    public func send(_ bytes: UnsafeMutablePointer<Int8>, length: UInt32, addr: Address, completion: @escaping (Result<Void>) -> Void) {
+        self.onSend = completion
         let req = UnsafeMutablePointer<uv_udp_send_t>.allocate(capacity: MemoryLayout<uv_udp_send_t>.size)
-        req.pointee.data = retainedVoidPointer(onSend)
+        req.pointee.data = Unmanaged.passUnretained(self).toOpaque()
         var data = uv_buf_init(bytes, length)
         
         let r = uv_udp_send(req, socket, &data, 1, addr.address) { req, status in
-            let onSend: ((Void) throws -> Void) -> Void = releaseVoidPointer(req!.pointee.data)
-            onSend {
-                if status > 0 {
-                    throw UVError.rawUvError(code: status)
-                }
+            let stream: UDPWrap = Unmanaged.fromOpaque(req!.pointee.data).takeUnretainedValue()
+            if status > 0 {
+                stream.onSend(.failure(UVError.rawUvError(code: status)))
+                return
             }
+            stream.onSend(.success())
         }
         
         if r < 0 {
-            onSend {
-                throw UVError.rawUvError(code: r)
-            }
+            completion(.failure(UVError.rawUvError(code: r)))
         }
     }
     
-    public func recv(onRecv: ((Void) throws -> (Data, Address)) -> Void) {
-        socket.pointee.data = retainedVoidPointer(onRecv)
+    public func recv(completion: @escaping (Result<(Data, Address)>) -> Void) {
+        self.onRecv = completion
+        socket.pointee.data = Unmanaged.passUnretained(self).toOpaque()
         
         let r = uv_udp_recv_start(socket, alloc_buffer) { req, nread, buf, sockaddr, flags in
             guard let req = req, let buf = buf, let sockaddr = sockaddr else {
@@ -114,19 +116,13 @@ public class UDPWrap: HandleWrap {
                 dealloc(buf.pointee.base, capacity: nread)
             }
             
-            let onRecv: ((Void) throws -> (Data, Address)) -> Void = releaseVoidPointer(req.pointee.data)
+            let stream: UDPWrap = Unmanaged.fromOpaque(req.pointee.data).takeUnretainedValue()
             
             if (nread == Int(UV_EOF.rawValue)) {
-                onRecv {
-                    throw StreamWrapError.eof
-                }
+                stream.onRecv(.failure(StreamWrapError.eof))
             } else if (nread < 0) {
-                onRecv {
-                    throw UVError.rawUvError(code: Int32(nread))
-                }
+                stream.onRecv(.failure(UVError.rawUvError(code: Int32(nread))))
             } else {
-                req.pointee.data = retainedVoidPointer(onRecv)
-                
                 // Get DHCP info
                 var sender = [Int8](repeating: 0, count: 17)
                 let addrin = unsafeBitCast(sockaddr, to: UnsafePointer<sockaddr_in>.self)
@@ -138,16 +134,12 @@ public class UDPWrap: HandleWrap {
                 #endif
                 
                 let addr = Address(host: String(validatingUTF8: sender)!, port: port)
-                onRecv {
-                    (Data(bytes: buf.pointee.base, count: nread), addr)
-                }
+                stream.onRecv(.success((Data(bytes: buf.pointee.base, count: nread), addr)))
             }
         }
         
         if r < 0 {
-            onRecv {
-                throw UVError.rawUvError(code: r)
-            }
+            completion(.failure(UVError.rawUvError(code: r)))
         }
     }
     
