@@ -13,6 +13,10 @@ import CLibUv
  */
 public class PipeWrap: StreamWrap {
     
+    private var onConnection: (Result<Void>) -> Void = { _ in }
+    
+    private var onConnect: (Result<Void>) -> Void = { _ in }
+    
     public init(pipe: UnsafeMutablePointer<uv_pipe_t>){
         super.init(pipe.cast(to: UnsafeMutablePointer<uv_stream_t>.self))
     }
@@ -41,28 +45,21 @@ public class PipeWrap: StreamWrap {
         }
     }
     
-    public func listen(_ backlog: UInt = 128, onConnection: ((Void) throws -> Void) -> Void) throws {
-        streamPtr.pointee.data = retainedVoidPointer(onConnection)
+    public func listen(_ backlog: UInt = 128, completion: @escaping (Result<Void>) -> Void) throws {
+        self.onConnection = completion
+        streamPtr.pointee.data = Unmanaged.passUnretained(self).toOpaque()
         
-        let result = uv_listen(streamPtr, Int32(backlog)) { stream, status in
-            guard let stream = stream else {
+        let result = uv_listen(streamPtr, Int32(backlog)) { streamPtr, status in
+            let stream: PipeWrap = Unmanaged.fromOpaque(streamPtr!.pointee.data).takeUnretainedValue()
+            guard status >= 0 else {
+                stream.onConnection(.failure(UVError.rawUvError(code: status)))
                 return
             }
-            
-            let onConnection: ((Void) throws -> Void) -> Void = releaseVoidPointer(stream.pointee.data)
-            guard status >= 0 else {
-                return onConnection {
-                    throw UVError.rawUvError(code: status)
-                }
-            }
-            
-            onConnection {}
+            stream.onConnection(.success())
         }
         
         if result < 0 {
-            onConnection {
-                throw UVError.rawUvError(code: result)
-            }
+            onConnection(.failure(UVError.rawUvError(code: result)))
         }
     }
     
@@ -72,25 +69,18 @@ public class PipeWrap: StreamWrap {
      - parameter sockName: Socket name to connect
      - parameter onConnect: Will be called when the connection is succeeded or failed
      */
-    public func connect(_ sockName: String, onConnect: ((Void) throws -> StreamWrap) -> Void){
-        let req = UnsafeMutablePointer<uv_connect_t>.allocate(capacity: MemoryLayout<uv_connect_t>.size)
+    public func connect(_ sockName: String, completion: @escaping (Result<Void>) -> Void){
+        self.onConnect = completion
         
-        req.pointee.data = retainedVoidPointer(onConnect)
+        let req = UnsafeMutablePointer<uv_connect_t>.allocate(capacity: MemoryLayout<uv_connect_t>.size)
+        req.pointee.data = Unmanaged.passUnretained(self).toOpaque()
         
         uv_pipe_connect(req, pipePtr, sockName) { req, status in
-            guard let req = req else {
-                return
-            }
-            let onConnect: ((Void) throws -> StreamWrap) -> Void = releaseVoidPointer(req.pointee.data)
+            let stream: PipeWrap = Unmanaged.fromOpaque(req!.pointee.data).takeUnretainedValue()
             if status < 0 {
-                onConnect {
-                    throw UVError.rawUvError(code: status)
-                }
+                stream.onConnect(.failure(UVError.rawUvError(code: status)))
             }
-            
-            onConnect {
-                StreamWrap(req.cast(to: UnsafeMutablePointer<uv_stream_t>.self))
-            }
+            stream.onConnect(.success())
         }
     }
 }

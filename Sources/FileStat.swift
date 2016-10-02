@@ -8,49 +8,35 @@
 
 import CLibUv
 
-struct FileStatContext {
-    var completion: ((Void) throws -> Void) -> Void
-}
-
 internal class FileStatWrap {
-    
-    let context: FileStatContext
     
     let path: String
     
     let loop: Loop
     
-    init(loop: Loop = Loop.defaultLoop, path: String, completion: @escaping ((Void) throws -> Void) -> Void){
+    init(loop: Loop = Loop.defaultLoop, path: String, completion: (Result<Void>) -> Void){
         self.loop = loop
         self.path = path
-        self.context = FileStatContext(completion: completion)
         
         var req = UnsafeMutablePointer<uv_fs_t>.allocate(capacity: MemoryLayout<uv_fs_t>.size)
-        req.pointee.data = retainedVoidPointer(context)
+        req.pointee.data = retainedVoidPointer(completion)
         
         let r = uv_fs_stat(loop.loopPtr, req, path) { req in
-            guard let req = req else { return }
-            
-            let context: FileStatContext = releaseVoidPointer(req.pointee.data)
-            
+            let req = req!
             defer {
                 fs_req_cleanup(req)
             }
             
+            let completion: (Result<Void>) -> Void = releaseVoidPointer(req.pointee.data)
             if(req.pointee.result < 0) {
-                return context.completion {
-                    throw UVError.rawUvError(code: Int32(req.pointee.result))
-                }
+                return completion(.failure(UVError.rawUvError(code: Int32(req.pointee.result))))
             }
-            
-            context.completion { }
+            completion(.success())
         }
         
         if r < 0 {
             fs_req_cleanup(req)
-            context.completion {
-                throw UVError.rawUvError(code: r)
-            }
+            completion(.failure(UVError.rawUvError(code: r)))
         }
     }
 }

@@ -34,10 +34,6 @@ public struct AddrInfo {
     }
 }
 
-private struct DnsContext {
-    let completion: ((Void) throws -> [AddrInfo]) -> Void
-}
-
 // TODO Should implement with uv_queue_work or uv_getnameinfo
 func sockaddr_description(addr: UnsafePointer<sockaddr>, length: UInt32) -> AddrInfo? {
     
@@ -79,27 +75,21 @@ extension addrinfo {
 }
 
 func getaddrinfo_cb(req: UnsafeMutablePointer<uv_getaddrinfo_t>?, status: Int32, res: UnsafeMutablePointer<addrinfo>?){
-    guard let req = req, let res = res else {
-        return
-    }
-    
-    let context: DnsContext = releaseVoidPointer(req.pointee.data)
+    let completion: (Result<[AddrInfo]>) -> Void = releaseVoidPointer(req!.pointee.data)
     
     defer {
         freeaddrinfo(res)
-        dealloc(req)
+        dealloc(req!)
     }
     
     if status < 0 {
-        return context.completion {
-            throw UVError.rawUvError(code: status)
-        }
+        return completion(.failure(UVError.rawUvError(code: status)))
     }
     
     var addrInfos = [AddrInfo]()
     
     
-    res.pointee.walk {
+    res!.pointee.walk {
         if $0.ai_next != nil {
             let addrInfo = sockaddr_description(addr: $0.ai_addr, length: $0.ai_addrlen)
             if let ai = addrInfo {
@@ -108,9 +98,7 @@ func getaddrinfo_cb(req: UnsafeMutablePointer<uv_getaddrinfo_t>?, status: Int32,
         }
     }
     
-    context.completion {
-        addrInfos
-    }
+    completion(.success(addrInfos))
 }
 
 /**
@@ -125,12 +113,10 @@ public class DNS {
      - parameter fqdn: The fqdn to resolve
      - parameter port: The port number(String) to resolve
      */
-    public static func getAddrInfo(loop: Loop = Loop.defaultLoop, fqdn: String, port: String? = nil, completion: @escaping ((Void) throws -> [AddrInfo]) -> Void){
+    public static func getAddrInfo(loop: Loop = Loop.defaultLoop, fqdn: String, port: String? = nil, completion: @escaping (Result<[AddrInfo]>) -> Void){
         let req = UnsafeMutablePointer<uv_getaddrinfo_t>.allocate(capacity: MemoryLayout<uv_getaddrinfo_t>.size)
         
-        let context = DnsContext(completion: completion)
-        
-        req.pointee.data = retainedVoidPointer(context)
+        req.pointee.data = retainedVoidPointer(completion)
         
         let r: Int32
         if let port = port {
@@ -140,14 +126,9 @@ public class DNS {
         }
         
         if r < 0 {
-            defer {
-                dealloc(req)
-            }
-            completion {
-                throw UVError.rawUvError(code: r)
-            }
+            completion(.failure(UVError.rawUvError(code: r)))
+            dealloc(req)
         }
-        
     }
 }
 

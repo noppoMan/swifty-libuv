@@ -16,7 +16,7 @@ import CLibUv
 import Foundation
 
 private struct FSContext {
-    var onOpen: ((Void) throws -> Int32) -> Void = {_ in}
+    var onOpen: (Result<Int32>) -> Void = {_ in}
 }
 
 // cleanup and free
@@ -53,7 +53,7 @@ public class FSWrap {
      - parameter position: Not implemented yet
      - parameter completion: Completion handler
      */
-    public static func read(_ fd: Int32, loop: Loop = Loop.defaultLoop, length: Int? = nil, position: Int = 0, completion: @escaping ((Void) throws -> Data) -> Void){
+    public static func read(_ fd: Int32, loop: Loop = Loop.defaultLoop, length: Int? = nil, position: Int = 0, completion: @escaping (Result<Data>) -> Void){
         let reader = FileReader(
             loop: loop,
             fd: fd,
@@ -75,7 +75,7 @@ public class FSWrap {
      - parameter position: Position to start writing
      - parameter completion: Completion handler
      */
-    public static func write(_ fd: Int32, loop: Loop = Loop.defaultLoop, data: Data, offset: Int = 0, length: Int? = nil, position: Int = 0, completion: @escaping ((Void) throws -> Void) ->  Void){
+    public static func write(_ fd: Int32, loop: Loop = Loop.defaultLoop, data: Data, offset: Int = 0, length: Int? = nil, position: Int = 0, completion: @escaping (Result<Void>) -> Void){
         let writer = FileWriter(
             loop: loop,
             fd: fd,
@@ -96,39 +96,30 @@ public class FSWrap {
      - parameter mode: mode for uv_fs_open
      - parameter completion: Completion handler
      */
-    public static func open(_ path: String, loop: Loop = Loop.defaultLoop, flags: FileMode = .read, mode: Int32? = nil, completion: @escaping ((Void) throws -> Int32) -> Void) {
+    public static func open(_ path: String, loop: Loop = Loop.defaultLoop, flags: Int32, mode: Int32, completion: @escaping (Result<Int32>) -> Void) {
         
         let context = FSContext(onOpen: completion)
         
         var req = UnsafeMutablePointer<uv_fs_t>.allocate(capacity: MemoryLayout<uv_fs_t>.size)
         req.pointee.data = retainedVoidPointer(context)
         
-        let r = uv_fs_open(loop.loopPtr, req, path, flags.value, mode != nil ? mode! : flags.defaultPermission) { req in
-            guard let req = req else {
-                return
-            }
-            
+        let r = uv_fs_open(loop.loopPtr, req, path, flags, mode) { req in
+            let req = req!
             let ctx: FSContext = releaseVoidPointer(req.pointee.data)
             defer {
                 fs_req_cleanup(req)
             }
             
             if(req.pointee.result < 0) {
-                return ctx.onOpen {
-                    throw UVError.rawUvError(code: Int32(req.pointee.result))
-                }
+                return ctx.onOpen(.failure(UVError.rawUvError(code: Int32(req.pointee.result))))
             }
             
-            ctx.onOpen {
-                Int32(req.pointee.result)
-            }
+            ctx.onOpen(.success(Int32(req.pointee.result)))
         }
         
         if r < 0 {
             fs_req_cleanup(req)
-            completion {
-                throw UVError.rawUvError(code: r)
-            }
+            completion(.failure(UVError.rawUvError(code: r)))
         }
     }
     
@@ -138,7 +129,7 @@ public class FSWrap {
      - parameter completion: Completion handler
      - parameter loop: Event Loop
      */
-    public static func stat(_ path: String, loop: Loop = Loop.defaultLoop, completion: @escaping ((Void) throws -> Void) -> Void) {
+    public static func stat(_ path: String, loop: Loop = Loop.defaultLoop, completion: @escaping (Result<Void>) -> Void) {
         _ = FileStatWrap(loop: loop, path: path, completion: completion)
     }
     
@@ -149,7 +140,7 @@ public class FSWrap {
      - parameter loop: Event Loop
      - parameter completion: Completion handler
      */
-    public static func close(_ fd: Int32, loop: Loop = Loop.defaultLoop, completion: ((Void) throws -> Void) -> Void = { _ in }){
+    public static func close(_ fd: Int32, loop: Loop = Loop.defaultLoop){
         let req = UnsafeMutablePointer<uv_fs_t>.allocate(capacity: MemoryLayout<uv_fs_t>.size)
         uv_fs_close(loop.loopPtr, req, uv_file(fd), nil)
         fs_req_cleanup(req)
