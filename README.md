@@ -1,6 +1,8 @@
 # swifty-libuv
 A libuv wrapper for Swift
 
+## This repository is outdated. Please check out https://github.com/noppoMan/Suv
+
 
 Wrapped Apis
 - [x] Handle
